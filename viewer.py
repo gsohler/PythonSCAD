@@ -2,12 +2,13 @@
 #! /home/gigl/anaconda3/bin/python
 
 # TODO editor syntax highlighting
-# TODO mirror
-#  ang_converrt, slice
-# TODO publish
 # TODO GTK3
-# TODO DOCU
-# TODO model loswerden ?
+# TODO size
+# Sample thingiverse publication
+# TODO extrude 2* mit wechselnden shapes
+# TODO gears
+
+
 
 
 import math
@@ -557,6 +558,17 @@ def dump():
 	print("Faces")
 	print(obj.faces)
 
+global dup
+def dup(n=1):
+	if len(meshstack) == 0:
+		message("No Object to dup")
+		return
+	obj=meshstack.pop()
+	for i in range(n+1):
+		meshstack.append(obj)
+
+
+
 global square
 def square(s=1):
 	if type(s) is not list:
@@ -641,7 +653,7 @@ def cylinder(h=1,r=1,r1=None,r2=None,n=16):
 		r1=r
 	if r2 is None:
 		r2=r
-	meshstack.append(pymesh.generate_cylinder([0,0,0],[0,0,h],r1,r2,num_segements=n))
+	meshstack.append(pymesh.generate_cylinder([0,0,0],[0,0,h],r1,r2,num_segments=n))
 
 global tube
 def tube(h=1,ro=1,ri=0.5,r1o=None,r2o=None,r1i=None,r2i=None,n=16):
@@ -711,18 +723,33 @@ def extrude_finish(obj,layers,conns,vertices,endcap=1):
 
 
 global linear_extrude
-def linear_extrude(height=1):
-	if len(meshstack) == 0:
-		message("No Object to extrude")
-		return
-	obj=meshstack.pop()
-	nv=len(obj.vertices)
-	layers=2
+def linear_extrude(height=1,layers=2,func=None): # TODO test func, udpate docu
+	if func is None:
+		if len(meshstack) == 0:
+			message("No Object to extrude")
+			return
+		obj=meshstack.pop()
+		nv=len(obj.vertices)
+	else:
+		vertices = None
+
 	conns=layers-1
 
 	# Generate Points
 	vertices = np.empty([layers*nv,3],dtype=float)
 	for j in range(layers):
+		if func is not None:
+			func(j)
+			if len(meshstack) == 0:
+				message("No Object to extrude")
+				return
+			obj=meshstack.pop()
+			if vertices is None:
+				nv=len(obj.vertices)
+				vertices = np.empty([layers*nv,3],dtype=float)
+			else:
+				if nv != len(obj.vertices):
+					message("Vertices of object must be constant!")
 		for i in range(nv):
 			vertices[j*nv+i][0]=obj.vertices[i][0]
 			vertices[j*nv+i][1]=obj.vertices[i][1]
@@ -737,7 +764,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 	conns=n
 	closed=1
 
-	if func == None:
+	if func is None:
 		if len(meshstack) == 0:
 			message("No Object to extrude")
 			return
@@ -775,6 +802,35 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 			vertices[j*nv+i][1]=obj.vertices[i][0]*math.sin(a2-(a2-a1)*j/conns)
 			vertices[j*nv+i][2]=obj.vertices[i][1]+elevation*j/conns
 	extrude_finish(obj,layers,conns,vertices,closed)
+
+global ang_convert # TODO in die docu
+def ang_convert(span,steps):
+	if len(meshstack) == 0:
+        	message("No Object to convert")
+		return
+
+	obj=meshstack.pop()
+	#TODO Sliceing an object is overkill, just add more points
+	result=None
+	step=1.0*span/steps
+	for i in range(steps):
+		mask=pymesh.generate_box_mesh([step*i,-100,-100],[step*(i+1),100,100])
+		slice=pymesh.boolean(obj,mask,"intersection")
+
+		vertices = np.empty([len(slice.vertices),3],dtype=float)
+		for i in range(len(slice.vertices)):
+			ang=slice.vertices[i][0]
+			r=slice.vertices[i][1]
+			vertices[i][0]=-r*math.cos(ang)
+			vertices[i][1]=r*math.sin(ang)
+			vertices[i][2]=slice.vertices[i][2]
+		tmp=pymesh.form_mesh(vertices,slice.faces)
+		if result is None:
+			result = tmp
+		else:
+			result =pymesh.boolean(result,tmp,"union")
+        meshstack.append(result)
+
 
 ####
 
@@ -897,6 +953,31 @@ def rotate(rot):
 		message("Dimension %d not supported"%(dim))
 
 
+global mirror # TODO docu
+def mirror(v):
+	if len(meshstack) == 0:
+		message("No Object to dup")
+		return
+	obj=meshstack.pop()
+	vertices = np.empty([len(obj.vertices),3],dtype=float)
+	faces = np.empty([len(obj.faces),3],dtype=float)
+	l=v[0]*v[0]+v[1]*v[1]+v[2]*v[2]
+	for i in range(len(obj.vertices)):
+		pt=obj.vertices[i]
+		# find distance from pt to plane therough [0/0/0],v
+		d=pt[0]*v[0]+pt[1]*v[1]+pt[2]*v[2]
+
+		vertices[i][0]=obj.vertices[i][0] -2*d*v[0]/l
+		vertices[i][1]=obj.vertices[i][1] -2*d*v[1]/l
+		vertices[i][2]=obj.vertices[i][2] -2*d*v[2]/l
+	for i in range(len(obj.faces)):
+		faces[i][0]=obj.faces[i][0]
+		faces[i][1]=obj.faces[i][2]
+		faces[i][2]=obj.faces[i][1]
+	meshstack.append(pymesh.form_mesh(vertices,faces))
+
+
+
 global top
 def top():
 	cube([2000,2000,1000])
@@ -958,6 +1039,16 @@ def union(n=2):
 		obj1 =pymesh.boolean(obj1,obj2,"union")
 	meshstack.append(obj1)
 
+global hull # TODO in die docu
+def hull():
+	if len(meshstack) == 0:
+        	message("No Object to hull")
+		return
+
+	obj=meshstack.pop()
+	obj=pymesh.convex_hull(obj)
+	meshstack.append(obj)
+
 global intersection
 def intersection(n=2):
 	if n == 1:
@@ -970,6 +1061,57 @@ def intersection(n=2):
 		obj2=meshstack.pop()
 		obj1 =pymesh.boolean(obj1,obj2,"intersection")
 	meshstack.append(obj1)
+
+# Cleanup
+
+global collapse_short_edges # TODO in die docu
+def collapse_short_edges(eps):
+	if len(meshstack) == 0:
+        	message("No Object to collapse")
+		return
+
+	obj=meshstack.pop()
+	obj,info = pymesh.collapse_short_edges(obj,eps)
+	meshstack.append(obj)
+
+global split_long_edges # TODO in die docu
+def split_long_edges(eps):
+	if len(meshstack) == 0:
+        	message("No Object to split")
+		return
+
+	obj=meshstack.pop()
+	obj,info = pymesh.split_long_edges(obj,eps)
+	meshstack.append(obj)
+
+
+global volume # TODO in die docu
+def volume():
+	volume=0
+	if len(meshstack) == 0:
+		message("No Object to translate")
+		return
+	obj=meshstack.pop()
+	dim=len(obj.vertices[0])
+	if  dim == 2:
+		for tri in obj.faces:
+			n=len(tri)
+			for j in range(n):
+				p1=obj.vertices[tri[j]]
+				p2=obj.vertices[tri[(j+1)%n]]
+				area=p1[0]*p2[1]-p1[1]*p2[0]
+				volume=volume+area
+	if  dim == 3:
+		for tri in obj.faces:
+			n=len(tri)
+			for j in range(n):
+				p1=obj.vertices[tri[j]]
+				p2=obj.vertices[tri[(j+1)%n]]
+				p3=obj.vertices[tri[(j+2)%n]]
+				area	=p1[0]*p2[1]*p3[2]+p1[1]*p2[2]*p3[0]+p1[2]*p2[0]*p3[1]-p1[2]*p2[1]*p3[0]-p1[0]*p2[2]*p3[1]-p1[1]*p2[0]*p3[2]
+				volume=volume+area
+	return volume/18.0;
+
 
 
 ####################################

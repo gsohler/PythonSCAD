@@ -1,54 +1,15 @@
 
-global ang_convert
-def ang_convert():
-	if len(meshstack) == 0:
-        	message("No Object to convert")
-		return
+global rotate_profile
+def rotate_profile(i):
+	square(10)
+	translate([-5,-5])
+	rotate(1.5*i)
+	translate([15,0])
+	
 
-	obj=meshstack.pop()
-
-	vertices = np.empty([len(obj.vertices),3],dtype=float)
-	for i in range(len(obj.vertices)):
-		ang=obj.vertices[i][0]
-		r=obj.vertices[i][1]
-		vertices[i][0]=-r*math.cos(ang)
-		vertices[i][1]=r*math.sin(ang)
-		vertices[i][2]=obj.vertices[i][2]
-        meshstack.append(pymesh.form_mesh(vertices,obj.faces))
-
-
-global hull
-def hull():
-	if len(meshstack) == 0:
-        	message("No Object to hull")
-		return
-
-	obj=meshstack.pop()
-	obj=pymesh.convex_hull(obj)
-	meshstack.append(obj)
-
-
-global collapse_short_edges
-def collapse_short_edges(eps):
-	if len(meshstack) == 0:
-        	message("No Object to collapse")
-		return
-
-	obj=meshstack.pop()
-	obj,info = pymesh.collapse_short_edges(obj,eps)
-	meshstack.append(obj)
-
-global split_long_edges
-def split_long_edges(eps):
-	if len(meshstack) == 0:
-        	message("No Object to split")
-		return
-
-	obj=meshstack.pop()
-	obj,info = pymesh.split_long_edges(obj,eps)
-	meshstack.append(obj)
-
-
+global rotate_demo
+def rotate_demo():
+	rotate_extrude(func=rotate_profile,n=180)
 
 global antisnore
 def antisnore():
@@ -64,18 +25,29 @@ def antisnore():
 #	translate([0,7])
 #	rotate_extrude(a1=-20,a2=20)
 
-
 global angtest
 def angtest():
-	cylinder(r=10,h=1)
-	rotate([90,0,0])
-	translate([10,12,0])
-	scale([0.1,1,1])
-	ang_convert()
+	cylinder(r=15,h=1)
+	rotate([92.5,0,2.5])
+	translate([10,0,0])
+	translate([[0,20,40,60,80,100,120,140],20,0])
+	
+
+	dup()
+	translate([10,0,20])
+	union()
+
+
+	scale([6.283/160.0,1,1])
+	ang_convert(7,15)
 
 
 def compile():
 	antisnore()
+	mirror([1,1,1])
+#	angtest()
+#	rotate_demo()
+
 compile()
 
 
