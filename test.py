@@ -11,8 +11,8 @@ global rotate_demo
 def rotate_demo():
 	rotate_extrude(func=rotate_profile,n=180)
 
-global antisnore
-def antisnore():
+global enterprise
+def enterprise():
 	path=[[0,0],[20,0],[20,20],[10,20],[10,10],[0,10]]
 	path=bezier(path,20)
 	polygon(path)
@@ -43,7 +43,7 @@ def angtest():
 
 
 def compile():
-	antisnore()
+	enterprise()
 	mirror([1,1,1])
 #	angtest()
 #	rotate_demo()
