@@ -1,15 +1,20 @@
 #! /usr/bin/python
 #! /home/gigl/anaconda3/bin/python
 
+# TODO achsen immer gleich hell
+# TODO profile verschieden viele segmente
+# TODO rotate_extrude linear_extrude mehr freiheitsgrade
+# TODO goal funktion
+# TODO rezept, start verschachtelung
+# TODO optimizer
+# TODO rotate_extrude_extrude anpassen
+
 # TODO editor syntax highlighting
 # TODO GTK3
-# TODO size
-# Sample thingiverse publication
+# TODO Sample thingiverse publication
 # TODO extrude 2* mit wechselnden shapes
 # TODO gears
-
-
-
+# TODO cache for speedup
 
 import math
 import argparse
@@ -253,12 +258,13 @@ def draw(glarea, event):
 	gluLookAt(0,1.5,2,0,0,0,0,1,0)
 	
 	# enable alpha blending
-	glEnable(GL_BLEND)
+#	glEnable(GL_BLEND)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	
 	# rotate axes to match reprap style
 	glRotated(-90, 1,0,0)
 
+	glNormal3f(1,0,0)
 	glTranslated(viewer.PX,viewer.PY,-0.5)
 	# user rotate model
 	glRotated(-viewer.RX, 1,0,0)
@@ -637,6 +643,128 @@ def bezier(src,n):
 		dst.append(work[0])
 	return dst
 
+global bezier_surface_sub
+def bezier_surface_sub(pts,x,y):
+	n=len(pts)
+	sumx=0
+	sumy=0
+	sumz=0
+
+	fr=[]
+	for row in range(n):
+		fr.append(math.pow(1.0-y,n-1-row)*math.pow(y,row)*math.factorial(n)/math.factorial(row+1)/math.factorial(n-row))
+	fc=[]
+	for col in range(n):
+		fc.append(math.pow(1.0-x,n-1-col)*math.pow(x,col)*math.factorial(n)/math.factorial(col+1)/math.factorial(n-col))
+
+	for row in range(n):
+		for col in range(n):
+			sumx =sumx + pts[row][col][0] * fr[row]*fc[col]
+			sumy =sumy + pts[row][col][1] * fr[row]*fc[col]
+			sumz =sumz  + pts[row][col][2] * fr[row]*fc[col]
+
+	
+	return([sumx,sumy,sumz])
+
+global bezier_surface
+def bezier_surface(pts,n=5,zmin=-1):
+	ground=0
+	vertices = np.empty([n*n+(n-1)*(n-1)+ground*(4*(n-1)+1),3],dtype=float)
+	# grosses grid
+	# kleines grid
+	# n-1 * 4 sockel
+	# sockelmittelpunkt
+
+	faces = np.empty([(n-1)*(n-1)*4+ground*(n-1)*4*3,3],dtype=int)
+	# 4fach gridmix
+	# (n-1)*4*2 mantel
+	# (n-1)*4 fusspunkt
+
+	vertoff=0
+	# grosses grid
+	for j in range(n):
+		for i in range(n):
+			vertices[vertoff+j*n+i]=bezier_surface_sub(pts,1.0*i/(n-1),1.0*j/(n-1))
+	vertoff = vertoff + n*n
+
+	# kleines grid
+	for j in range(n-1):
+		for i in range(n-1):
+			vertices[vertoff+j*(n-1)+i]=bezier_surface_sub(pts,1.0*(i+0.5)/(n-1),1.0*(j+0.5)/(n-1))
+	vertoff=vertoff+(n-1)*(n-1)
+
+	if ground == 1:
+		sockeltop=[]	
+		sockel=[]
+		#sockel
+		# x+
+		for i in range(n-1):
+			ind=i
+			sockeltop.append(ind)
+			sockel.append(vertoff)
+			vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+			vertoff=vertoff+1
+
+		# y+
+		for i in range(n-1):
+			ind=n-1+i*n
+			sockeltop.append(ind)
+			sockel.append(vertoff)
+			vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+			vertoff=vertoff+1
+
+		# x-
+		for i in range(n-1):
+			ind=n*n-1-i
+			sockeltop.append(ind)
+			sockel.append(vertoff)
+			vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+			vertoff=vertoff+1
+
+		# y-
+		for i in range(n-1):
+			ind=n*(n-1)-i*n
+			sockeltop.append(ind)
+			sockel.append(vertoff)
+			vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+			vertoff=vertoff+1
+
+		pt=bezier_surface_sub(pts,0.5,0.5)
+		vertices[vertoff]=[pt[0],pt[1],zmin]
+		ci=vertoff
+
+	# dreiecke
+	faceoffset=0
+	for j in range(n-1):
+		for i in range(n-1):
+			faces[4*(j*(n-1)+i)+0][0]=j*n+i
+			faces[4*(j*(n-1)+i)+0][1]=j*n+i+1
+			faces[4*(j*(n-1)+i)+0][2]=n*n+j*(n-1)+i
+			faces[4*(j*(n-1)+i)+1][0]=j*n+i+1
+			faces[4*(j*(n-1)+i)+1][1]=j*n+i+1+n
+			faces[4*(j*(n-1)+i)+1][2]=n*n+j*(n-1)+i
+			faces[4*(j*(n-1)+i)+2][0]=j*n+i+1+n
+			faces[4*(j*(n-1)+i)+2][1]=j*n+i+n
+			faces[4*(j*(n-1)+i)+2][2]=n*n+j*(n-1)+i
+			faces[4*(j*(n-1)+i)+3][0]=j*n+i+n
+			faces[4*(j*(n-1)+i)+3][1]=j*n+i
+			faces[4*(j*(n-1)+i)+3][2]=n*n+j*(n-1)+i
+
+	faceoffset=faceoffset+4*(n-1)*(n-1)
+
+	if ground == 1:
+		# sockel verzippen
+		l=len(sockel)
+		for i in range(len(sockel)):
+			faces[faceoffset]=[sockel[i],sockel[(i+1)%l],sockeltop[(i+1)%l]]
+			faceoffset=faceoffset+1
+			faces[faceoffset]=[sockel[i],sockeltop[(i+1)%l],sockeltop[i]]
+			faceoffset=faceoffset+1
+
+			faces[faceoffset]=[sockel[(i+1)%l],sockel[i],ci]
+			faceoffset=faceoffset+1
+	
+	meshstack.append(pymesh.form_mesh(vertices,faces))
 
 global cube	
 def cube(dim=[1,1,1]):
@@ -677,66 +805,196 @@ def dodecahedron(r=1):
 	meshstack.append(dod)
 
 ####
-def extrude_finish(obj,layers,conns,vertices,endcap=1):
+
+def triangle_combine(faces):
+	# Build edge sea
+	edge_sea=[]
+	for face in faces:
+		n=len(face)
+		for i in range(n):
+			edge_sea.append([face[i],face[(i+1)%n]])
+
+	# Remove duplicate edges in edge_sea
+	n=len(edge_sea)
+	edge_sea_new = []
+	for i in range(n):
+		if edge_sea[i] is None:
+			continue
+		dup=False
+		for j in range(n-i-1):
+			if edge_sea[i+j+1] is None:
+				continue
+			if edge_sea[i][0] == edge_sea[i+j+1][1]:
+				if edge_sea[i][1] == edge_sea[i+j+1][0]:
+					edge_sea[i+j+1]=None
+					dup=True
+					break # break inner loop, so outer loop will do a continue
+		if dup is False:
+			edge_sea_new.append(edge_sea[i])
+	edge_sea = edge_sea_new
+
+	# build polygons again
+
+	n=len(edge_sea)
+	nd=0
+	results = []
+	while nd < n:
+		ind=edge_sea[0][0]
+		result=[ind]
+		while True:
+			done=False
+			for i in range(n):
+				if edge_sea[i] is None:
+					continue	
+				if edge_sea[i][0] == ind:
+					ind=edge_sea[i][1]
+					edge_sea[i]=None
+					result.append(ind)
+					done=True
+					nd=nd+1
+			if done == False:
+				break
+		if result[0] != result[-1]:
+			print "Polygon is not closed!"
+			return
+		result.pop()
+		results.append(result)
+	return results
+
+def extrude_finish_angle(vertices,faces,faceind,i1,i2,i3):
+	pt1=vertices[faces[faceind][i1]]
+	pt2=vertices[faces[faceind][i2]]
+	pt3=vertices[faces[faceind][i3]]
+	d1=[pt2[0]-pt1[0],pt2[1]-pt1[1],pt2[2]-pt1[2]]
+	d2=[pt3[0]-pt2[0],pt3[1]-pt2[1],pt3[2]-pt2[2]]
+	ang=math.acos((d1[0]*d2[0]+d1[1]*d2[1]+d1[2]*d2[2])/math.sqrt((d1[0]*d1[0]+d1[1]*d1[1]+d1[2]*d1[2])*(d2[0]*d2[0]+d2[1]*d2[1]+d2[2]*d2[2])))
+
+	return 180.0-ang*180.0/3.1415
+
+def extrude_finish_link(vertices,faces,p1x,p2x,faceoff,off):
+	n1=len(p1x)
+	n2=len(p2x)
+	i1=0
+	i2=0
+	while i1 < n1 and i2 < n2: # TODO hier alg besser!
+		faces[faceoff,0]=p1x[(i1+1)%n1]
+		faces[faceoff,1]=p2x[(i2+1+off)%n2]
+		faces[faceoff,2]=p1x[i1]
+#		ang1=extrude_finish_angle(vertices,faces,faceoff,2,0,1)
+#		ang2=extrude_finish_angle(vertices,faces,faceoff,1,2,0)
+#		print(ang1,ang2)
+		faceoff=faceoff+1
+		# angle 2:0:1  1:2:0
+
+		faces[faceoff,0]=p2x[(i2+off)%n2]
+		faces[faceoff,1]=p1x[i1]
+		faces[faceoff,2]=p2x[(i2+off+1)%n2]
+#		ang1=extrude_finish_angle(vertices,faces,faceoff,2,0,1)
+#		ang2=extrude_finish_angle(vertices,faces,faceoff,1,2,0)
+#		print(ang1,ang2)
+		faceoff=faceoff+1
+				
+		i1=i1+1
+		i2=i2+1
+
+
+def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
 	nf=len(obj.faces)
 	nv=len(obj.vertices)
 	nd=len(obj.faces[0]) # points per face
-
-	# Interior faces of base polygons assembled by tri/quads are also built
-	faces = np.empty([2*nf*endcap+conns*nd*nf*(5-nd),nd],dtype=int)
-#	for j in range(len(faces)):
-#		for i in range(nd):
-#			faces[j][i]=-1
-
+	# Calculate number of faces required
+	faces_num=0
 	if endcap == 1:
-		for i in range(nf):
-			for j in range(nd):
-				faces[i][j]=obj.faces[i][nd-j-1] # Bottom Face
-				faces[nf+i][j]=obj.faces[i][j]+conns*nv # Top Face
+		faces_num = faces_num + 2*nf
+	for x in range(conns):
+		p1 = profile[x]
+		p2 = profile[(x+1)%layers]
+		for p in p1:
+			faces_num = faces_num+len(p)/(nd-2)
+		for p in p2:
+			faces_num = faces_num+len(p)/(nd-2)
+
+	faceoff=0
 
 	if nd == 3:
 
-		# Side walls
-		for x in range(conns):
+		faces = np.empty([faces_num,nd],dtype=int)
+
+		if endcap == 1:
 			for i in range(nf):
 				for j in range(nd):
-					faces[2*nf*endcap+2*(nd*(x*nf+i)+j)+0,0]=obj.faces[i][j]+x*nv
-					faces[2*nf*endcap+2*(nd*(x*nf+i)+j)+0,1]=obj.faces[i][(j+1)%nd]+x*nv
-					faces[2*nf*endcap+2*(nd*(x*nf+i)+j)+0,2]=obj.faces[i][(j+1)%nd]+((x+1)%layers)*nv
+					faces[faceoff+i][j]=obj.faces[i][nd-j-1] # Bottom Face
+					faces[faceoff+nf+i][j]=obj.faces[i][j]+conns*nv # Top Face
+			faceoff=2*nf
 
-					faces[2*nf*endcap+2*(nd*(x*nf+i)+j)+1,0]=obj.faces[i][j]+x*nv
-					faces[2*nf*endcap+2*(nd*(x*nf+i)+j)+1,1]=obj.faces[i][(j+1)%nd]+((x+1)%layers)*nv
-					faces[2*nf*endcap+2*(nd*(x*nf+i)+j)+1,2]=obj.faces[i][j]+((x+1)%layers)*nv
+		# Side walls
+		for x in range(conns):
+			p1=profile[x]
+			p2=profile[(x+1)%layers]
+			for i in range(len(p1)):
+				p1x=p1[i]
+				p2x=p2[i]
+
+				off=0
+				extrude_finish_link(vertices,faces,p1x,p2x,faceoff,off)	
+				faceoff += len(p1x)+len(p2x)
+	
+					
 
 	if nd == 4:
 
-		# Side walls
-		for x in range(conns):
+		faces = np.empty([faces_num,nd],dtype=int)
+
+		if endcap == 1:
 			for i in range(nf):
 				for j in range(nd):
-					faces[2*nf*endcap+nd*(x*nf+i)+j,0]=obj.faces[i][j]+x*nv
-					faces[2*nf*endcap+nd*(x*nf+i)+j,1]=obj.faces[i][(j+1)%nd]+x*nv
-					faces[2*nf*endcap+nd*(x*nf+i)+j,2]=obj.faces[i][(j+1)%nd]+((x+1)%layers)*nv
-					faces[2*nf*endcap+nd*(x*nf+i)+j,3]=obj.faces[i][j]+((x+1)%layers)*nv
+					faces[faceoff+i][j]=obj.faces[i][nd-j-1] # Bottom Face
+					faces[faceoff+nf+i][j]=obj.faces[i][j]+conns*nv # Top Face
+			faceoff=2*nf
+
+		# Side walls
+		for x in range(conns):
+			p1=profile[x]
+			p2=profile[(x+1)%layers]
+			for i in range(len(p1)):
+				p1x=p1[i]
+				p2x=p2[i]
+				n1=len(p1x)
+				n2=len(p2x)
+				i1=0
+				i2=0
+				while i1 < n1 and i2 < n2: # TODO hier alg besser!
+					faces[faceoff,0]=p1x[i1]
+					faces[faceoff,1]=p1x[(i1+1)%n1]
+					faces[faceoff,2]=p2x[(i2+1)%n2]
+					faces[faceoff,2]=p2x[i2]
+					faceoff=faceoff+1
+					i1=i1+1
+					i2=i2+1
+	
 
 	meshstack.append(pymesh.form_mesh(vertices,faces))
 
 
 global linear_extrude
-def linear_extrude(height=1,layers=2,func=None): # TODO test func, udpate docu
+def linear_extrude(height=1,n=2,func=None):
 	if func is None:
 		if len(meshstack) == 0:
 			message("No Object to extrude")
 			return
 		obj=meshstack.pop()
 		nv=len(obj.vertices)
+		profile=triangle_combine(obj.faces)
 	else:
 		vertices = None
 
+	profiles = []
+	layers=n
 	conns=layers-1
 
 	# Generate Points
 	vertices = np.empty([layers*nv,3],dtype=float)
+	vertice_off=0
 	for j in range(layers):
 		if func is not None:
 			func(j)
@@ -747,15 +1005,24 @@ def linear_extrude(height=1,layers=2,func=None): # TODO test func, udpate docu
 			if vertices is None:
 				nv=len(obj.vertices)
 				vertices = np.empty([layers*nv,3],dtype=float)
+				profile=triangle_combine(obj.faces)
 			else:
 				if nv != len(obj.vertices):
 					message("Vertices of object must be constant!")
 		for i in range(nv):
-			vertices[j*nv+i][0]=obj.vertices[i][0]
-			vertices[j*nv+i][1]=obj.vertices[i][1]
-			vertices[j*nv+i][2]=height*j/(layers-1)
+			vertices[vertice_off+i][0]=obj.vertices[i][0]
+			vertices[vertice_off+i][1]=obj.vertices[i][1]
+			vertices[vertice_off+i][2]=1.0*height*j/(layers-1.0)
+		tmp_profile=[]
+		for subprof in profile:
+			newsubprof=[]
+			for ind in subprof:
+				newsubprof.append(ind+vertice_off)
+			tmp_profile.append(newsubprof)
+		profiles.append(tmp_profile)
+		vertice_off = vertice_off+nv
 
-	extrude_finish(obj,layers,conns,vertices,1)
+	extrude_finish(obj,layers,conns,vertices,profiles,1)
 
 global rotate_extrude
 def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
@@ -764,6 +1031,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 	conns=n
 	closed=1
 
+	profiles = []
 	if func is None:
 		if len(meshstack) == 0:
 			message("No Object to extrude")
@@ -771,6 +1039,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 		obj=meshstack.pop()
 		nv=len(obj.vertices)
 		vertices = np.empty([layers*nv,3],dtype=float)
+		profile=triangle_combine(obj.faces)
 	else:
 		vertices=None
 
@@ -783,6 +1052,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 	
 
 	# Generate Points
+	vertice_off=0
 	for j in range(layers):
 		if func is not None:
 			func(j)
@@ -793,17 +1063,26 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 			if vertices is None:
 				nv=len(obj.vertices)
 				vertices = np.empty([layers*nv,3],dtype=float)
+				profile=triangle_combine(obj.faces)
 			else:
 				if nv != len(obj.vertices):
 					message("Vertices of object must be constant!")
 	
 		for i in range(nv):
-			vertices[j*nv+i][0]=obj.vertices[i][0]*math.cos(a2-(a2-a1)*j/conns)
-			vertices[j*nv+i][1]=obj.vertices[i][0]*math.sin(a2-(a2-a1)*j/conns)
-			vertices[j*nv+i][2]=obj.vertices[i][1]+elevation*j/conns
-	extrude_finish(obj,layers,conns,vertices,closed)
+			vertices[vertice_off+i][0]=obj.vertices[i][0]*math.cos(a2-(a2-a1)*j/conns)
+			vertices[vertice_off+i][1]=obj.vertices[i][0]*math.sin(a2-(a2-a1)*j/conns)
+			vertices[vertice_off+i][2]=obj.vertices[i][1]+elevation*j/conns
+		tmp_profile=[]
+		for subprof in profile:
+			newsubprof=[]
+			for ind in subprof:
+				newsubprof.append(ind+vertice_off)
+			tmp_profile.append(newsubprof)
+		profiles.append(tmp_profile)
+		vertice_off = vertice_off+nv
+	extrude_finish(obj,layers,conns,vertices,profiles,closed)
 
-global ang_convert # TODO in die docu
+global ang_convert
 def ang_convert(span,steps):
 	if len(meshstack) == 0:
         	message("No Object to convert")
@@ -953,14 +1232,14 @@ def rotate(rot):
 		message("Dimension %d not supported"%(dim))
 
 
-global mirror # TODO docu
+global mirror
 def mirror(v):
 	if len(meshstack) == 0:
-		message("No Object to dup")
+		message("No Object to mirror")
 		return
 	obj=meshstack.pop()
 	vertices = np.empty([len(obj.vertices),3],dtype=float)
-	faces = np.empty([len(obj.faces),3],dtype=float)
+	faces = np.empty([len(obj.faces),3],dtype=int)
 	l=v[0]*v[0]+v[1]*v[1]+v[2]*v[2]
 	for i in range(len(obj.vertices)):
 		pt=obj.vertices[i]
@@ -975,6 +1254,111 @@ def mirror(v):
 		faces[i][1]=obj.faces[i][2]
 		faces[i][2]=obj.faces[i][1]
 	meshstack.append(pymesh.form_mesh(vertices,faces))
+
+
+global CutPlaneStraight
+def CutPlaneStraight(plpos,pldir,s,sd): # Flaeche mit Gerade  s, s-dir schneiden: punkt
+        h =np.dot(pldir,sd) 
+        if math.fabs(h) < 0.001:
+                return None
+        q=(np.dot(pldir,plpos)-np.dot(pldir,s))/h  
+        return s + ( sd * q )
+
+global CutPlanePlane
+def CutPlanePlane(p1,n1, p2,n2): # return list(pos, dir)
+	n3 = np.cross(n1,n2)
+	n3s=np.linalg.norm(n3)
+        if math.fabs(n3s) < 0.001:
+                return None,None
+	n3 = n3/n3s
+
+        nx=np.cross(n1,n3)
+        p3=CutPlaneStraight(p2,n2,p1,nx)
+	if p3 is None:
+		return None
+        return p3,n3
+
+
+global size
+def size(s=1.0):
+	if len(meshstack) == 0:
+		message("No Object to size")
+		return
+	obj=meshstack.pop()
+
+	obj=pymesh.resolve_self_intersection(obj)
+
+	# gemeinsame flaechen weg, kanten verlaengern
+	obj.add_attribute("face_normal")
+	norms=obj.get_face_attribute("face_normal")
+
+	vertices = np.empty([len(obj.vertices),3],dtype=float)
+	# schauen in welchen triangles p evrwendet wird
+	refatpoint=[]
+	diratpoint=[]
+	for i in range(len(obj.vertices)):
+		refatpoint.append([])
+		diratpoint.append([])
+
+
+	for i in range(len(obj.faces)):
+		face=obj.faces[i]
+		dir=norms[i]
+		for j in range(len(face)):
+			ind=face[j]
+			ref=[s*dir[0]+obj.vertices[ind][0],s*dir[1]+obj.vertices[ind][1],s*dir[2]+obj.vertices[ind][2]]
+			diratpoint[ind].append(dir)
+			refatpoint[ind].append(ref)
+
+	# jetzt alle pt schneiden
+
+	for i in range(len(obj.vertices)):
+
+		vertices[i]=obj.vertices[i] # fallback
+
+		dirs=diratpoint[i]
+		refs = refatpoint[i]
+
+		if len(dirs) == 0:
+			continue
+		dir1 = dirs.pop()
+		ref1 = refs.pop()
+
+		vertices[i] = ref1 # better fallback
+				
+		#  2 ebenen schneiden/widerholen
+		while True:		
+			if len(dirs) == 0:
+				sp = None
+				break
+			dir2 = dirs.pop()
+			ref2 = refs.pop()
+
+			sp,sd = CutPlanePlane(ref1,dir1,ref2,dir2)
+			if sp is not None:
+				break
+		if sp is None:
+			continue
+
+		# ebene mit gerade schneiden
+		while True:
+			if len(dirs) == 0:
+				pt = None
+				break
+			dir3 = dirs.pop()
+			ref3 = refs.pop()
+			pt=CutPlaneStraight(ref3,dir3,sp,sd)
+			if pt is not None:
+				break
+		if pt is not None:
+			vertices[i]=pt
+		else:
+			vertices[i]=sp # Kompromiss
+
+	obj=pymesh.resolve_self_intersection(obj)
+# pymesh.nerge_meshes
+	obj=pymesh.form_mesh(vertices,obj.faces)
+	meshstack.append(obj)
 
 
 
@@ -1039,7 +1423,48 @@ def union(n=2):
 		obj1 =pymesh.boolean(obj1,obj2,"union")
 	meshstack.append(obj1)
 
-global hull # TODO in die docu
+global concat
+def concat(n=2):
+	if n == 1:
+		return
+	if len(meshstack) < n:
+		message("Too less Objects for Concat")
+		return
+	objs=[]
+
+	# Calculate number of required vertices and faces
+	vertlen=0
+	facelen=0
+	for i in range(n):
+		obj=meshstack.pop()
+		vertlen += len(obj.vertices)
+		facelen += len(obj.faces)
+		objs.append(obj)
+
+
+	vertices = np.empty([vertlen,3],dtype=float)
+	faces = np.empty([facelen,3],dtype=int)
+
+	# Now concatenate all vertices and faces
+	vertoff=0
+	faceoff=0
+	for i in range(n):
+		obj=objs[i]
+		for j in range(len(obj.vertices)):
+			vert=obj.vertices[j]
+			vertices[j+vertoff]=vert
+
+		for j in range(len(obj.faces)):
+			face=obj.faces[j]
+			faces[j+faceoff] = [face[0]+vertoff,face[1]+vertoff,face[2]+vertoff]
+
+		vertoff = vertoff + len(obj.vertices)
+		faceoff = faceoff + len(obj.faces)
+	obj=pymesh.form_mesh(vertices,faces)
+	meshstack.append(obj)
+
+
+global hull
 def hull():
 	if len(meshstack) == 0:
         	message("No Object to hull")
@@ -1064,7 +1489,7 @@ def intersection(n=2):
 
 # Cleanup
 
-global collapse_short_edges # TODO in die docu
+global collapse_short_edges
 def collapse_short_edges(eps):
 	if len(meshstack) == 0:
         	message("No Object to collapse")
@@ -1074,7 +1499,7 @@ def collapse_short_edges(eps):
 	obj,info = pymesh.collapse_short_edges(obj,eps)
 	meshstack.append(obj)
 
-global split_long_edges # TODO in die docu
+global split_long_edges
 def split_long_edges(eps):
 	if len(meshstack) == 0:
         	message("No Object to split")
@@ -1085,11 +1510,11 @@ def split_long_edges(eps):
 	meshstack.append(obj)
 
 
-global volume # TODO in die docu
+global volume
 def volume():
 	volume=0
 	if len(meshstack) == 0:
-		message("No Object to translate")
+		message("No Object to calculate")
 		return
 	obj=meshstack.pop()
 	dim=len(obj.vertices[0])
@@ -1142,6 +1567,10 @@ def render(window):
 		union(len(meshstack))
 
 	mesh=meshstack.pop()
+	if len(mesh.vertices) == 0:
+		viewer.renderVertices()
+		return
+
 	if len(mesh.vertices[0]) == 2:
 		meshstack.append(mesh)
 		linear_extrude(1)
@@ -1169,7 +1598,7 @@ def render(window):
 			ptmax[2] = pt[2]
 		if pt[2] < ptmin[2]:
 			ptmin[2] = pt[2]
-	print("Dimension %g:%g:%g\n",ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2])
+	print("Dimension [%g %g %g]\n"%(ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2]))
 	v = mesh.vertices;
 	mesh.add_attribute("face_normal")
 	norms=mesh.get_face_attribute("face_normal")
