@@ -518,6 +518,7 @@ def message(str):
 	md.destroy()
 ####################################
 # MyTextView
+w
 ####################################
 
 class MyTextView(gtk.TextView):
@@ -803,6 +804,12 @@ global dodecahedron
 def dodecahedron(r=1):
 	dod=pymesh.generate_dodecahedron(r,[0,0,0])
 	meshstack.append(dod)
+
+global import_obj
+def import_obj(filename):
+	obj=pymesh.load_mesh(filename)
+	meshstack.append(obj)
+
 
 ####
 

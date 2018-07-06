@@ -92,7 +92,6 @@ global import_obj
 def import_obj(filename):
 	obj=pymesh.load_mesh(filename)
 	meshstack.append(obj)
-	pass
 
 def compile():
 #	cube([10,10,10])
