@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 #! /home/gigl/anaconda3/bin/python
 
 # TODO achsen immer gleich hell
@@ -22,15 +22,16 @@ import sys
 import signal
 import numpy as np
 
-import pygtk
-pygtk.require('2.0')
-import gtk
-import pango
-import gtk.gtkgl
-from OpenGL.GLUT import *
-from OpenGL.GLU import *
-from OpenGL.GL import *
-import gobject
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+
+#import pango
+#import Gtk.Gtkgl
+#from OpenGL.GLUT import *
+#from OpenGL.GLU import *
+#from OpenGL.GL import *
+#import gobject
 import os.path
 import time
 from model import *
@@ -352,7 +353,7 @@ def reshape(glarea, event):
 
 def keypressevent(window, event):
 	global modifiers
-	keyname = gtk.gdk.keyval_name(event.keyval)
+	keyname = Gtk.gdk.keyval_name(event.keyval)
 	if keyname == "F1":
 		save_script(window)
 		message( "Script saved")
@@ -365,7 +366,7 @@ def keypressevent(window, event):
 
 def keyreleaseevent(window, event):
 	global modifiers
-	keyname = gtk.gdk.keyval_name(event.keyval)
+	keyname = Gtk.gdk.keyval_name(event.keyval)
 	if keyname == "Shift_L" or keyname == "Shift_R":
 		modifiers=0
 
@@ -511,9 +512,9 @@ def init(glarea):
 def message(str):
 	global win
 	parent = None
-	md = gtk.MessageDialog(win, 
-		gtk.DIALOG_DESTROY_WITH_PARENT, gtk.MESSAGE_INFO, 
-	    gtk.BUTTONS_OK, str)
+	md = Gtk.MessageDialog(win, 
+		Gtk.DIALOG_DESTROY_WITH_PARENT, Gtk.MESSAGE_INFO, 
+	    Gtk.BUTTONS_OK, str)
 	md.run()
 	md.destroy()
 ####################################
@@ -521,10 +522,10 @@ def message(str):
 w
 ####################################
 
-class MyTextView(gtk.TextView):
+class MyTextView(Gtk.TextView):
 	def __init__(self):
-		gtk.TextView.__init__(self)
-		self.set_border_window_size(gtk.TEXT_WINDOW_LEFT, 24)
+		Gtk.TextView.__init__(self)
+		self.set_border_window_size(Gtk.TEXT_WINDOW_LEFT, 24)
 		self.connect("expose-event", on_text_view_expose_event)
 
 def on_text_view_expose_event(text_view, event):
@@ -536,12 +537,12 @@ def on_text_view_expose_event(text_view, event):
 	layout.set_markup("\n".join([str(x + 1) for x in range(nlines)]))
 	layout.set_alignment(pango.ALIGN_LEFT)
 	width = layout.get_pixel_size()[0]
-	text_view.set_border_window_size(gtk.TEXT_WINDOW_LEFT, width + 4)
-	y = -text_view.window_to_buffer_coords(gtk.TEXT_WINDOW_LEFT, 2, 0)[1]
-	window = text_view.get_window(gtk.TEXT_WINDOW_LEFT)
+	text_view.set_border_window_size(Gtk.TEXT_WINDOW_LEFT, width + 4)
+	y = -text_view.window_to_buffer_coords(Gtk.TEXT_WINDOW_LEFT, 2, 0)[1]
+	window = text_view.get_window(Gtk.TEXT_WINDOW_LEFT)
 	window.clear()
 	text_view.style.paint_layout(window=window,
-		state_type=gtk.STATE_NORMAL,
+		state_type=Gtk.STATE_NORMAL,
 		use_text=True,
 		area=None,
 		widget=text_view,
@@ -1640,23 +1641,23 @@ def export_stl(window):
 		viewer.renderVertices()
 		return
 	mesh = meshstack[0] 
-	text_filter=gtk.FileFilter()
+	text_filter=Gtk.FileFilter()
 	text_filter.set_name("Text files")
 	text_filter.add_mime_type("text/*")
-	all_filter=gtk.FileFilter()
+	all_filter=Gtk.FileFilter()
 	all_filter.set_name("All files")
 	all_filter.add_pattern("*")
 
 	filename=None
-	dialog=gtk.FileChooserDialog(title="Select a File", action=gtk.FILE_CHOOSER_ACTION_SAVE,
-		buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK))
+	dialog=Gtk.FileChooserDialog(title="Select a File", action=Gtk.FILE_CHOOSER_ACTION_SAVE,
+		buttons=(Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL, Gtk.STOCK_SAVE, Gtk.RESPONSE_OK))
 	
 	dialog.add_filter(text_filter)
 	dialog.add_filter(all_filter)
 	
 	response = dialog.run()
 	
-	if response == gtk.RESPONSE_OK:
+	if response == Gtk.RESPONSE_OK:
 		filename = dialog.get_filename()
 		pymesh.save_mesh(filename, mesh);
 		message("File Exported")
@@ -1666,7 +1667,7 @@ def export_stl(window):
 # GLX version
 #
 
-major, minor = gtk.gdkgl.query_version()
+major, minor = Gtk.gdkgl.query_version()
 
 #
 # frame buffer configuration
@@ -1675,13 +1676,13 @@ major, minor = gtk.gdkgl.query_version()
 # use GLUT-style display mode bitmask
 try:
 	# try double-buffered
-	glconfig = gtk.gdkgl.Config(mode=(gtk.gdkgl.MODE_RGB|
-				  gtk.gdkgl.MODE_DOUBLE |
-				   gtk.gdkgl.MODE_DEPTH))
-except gtk.gdkgl.NoMatches:
+	glconfig = Gtk.gdkgl.Config(mode=(Gtk.gdkgl.MODE_RGB|
+				  Gtk.gdkgl.MODE_DOUBLE |
+				   Gtk.gdkgl.MODE_DEPTH))
+except Gtk.gdkgl.NoMatches:
 	# try single-buffered
-	glconfig = gtk.gdkgl.Config(mode=(gtk.gdkgl.MODE_RGB	|
-					  gtk.gdkgl.MODE_DEPTH))
+	glconfig = Gtk.gdkgl.Config(mode=(Gtk.gdkgl.MODE_RGB	|
+					  Gtk.gdkgl.MODE_DEPTH))
 
 
 parser = argparse.ArgumentParser()
@@ -1695,7 +1696,7 @@ tv = MyTextView()
 tv.set_size_request(300, 600)
 
 #tv.connect("draw", on_text_view_draw)
-tvscroll = gtk.ScrolledWindow()
+tvscroll = Gtk.ScrolledWindow()
 tvscroll.add(tv)
 
 model = Model()
@@ -1719,7 +1720,7 @@ if args.file.endswith(".py"):
 		textbuffer.set_text(string)
 
 #
-# top-level gtk.Window
+# top-level Gtk.Window
 #
 
 
@@ -1728,17 +1729,17 @@ viewer.setModel(model)
 
 
 
-win = gtk.Window()
+win = Gtk.Window()
 win.set_title("Model Viewer")
 
 #if sys.platform != 'win32':
-#	win.set_resize_mode(gtk.RESIZE_IMMEDIATE)
+#	win.set_resize_mode(Gtk.RESIZE_IMMEDIATE)
 win.set_reallocate_redraws(True)
 
-win.connect('destroy', gtk.main_quit)
+win.connect('destroy', Gtk.main_quit)
 
 
-glarea = gtk.gtkgl.DrawingArea(glconfig)
+glarea = Gtk.Gtkgl.DrawingArea(glconfig)
 glarea.set_size_request(500, 600)
 
 glarea.connect_after('realize', init)
@@ -1749,34 +1750,34 @@ glarea.connect('button-press-event',buttonpress)
 glarea.connect('button-release-event',buttonrelease)
 glarea.connect('motion-notify-event',pointermotion)
 glarea.connect('scroll-event',scrollevent)
-glarea.set_events(gtk.gdk.BUTTON_PRESS_MASK | gtk.gdk.BUTTON_RELEASE_MASK | gtk.gdk.POINTER_MOTION_MASK)
+glarea.set_events(Gtk.gdk.BUTTON_PRESS_MASK | Gtk.gdk.BUTTON_RELEASE_MASK | Gtk.gdk.POINTER_MOTION_MASK)
 glarea.show()
 
-hbox = gtk.HPaned()
+hbox = Gtk.HPaned()
 hbox.add(tvscroll)
 hbox.add(glarea)
 
-filesave = gtk.MenuItem("Save")
+filesave = Gtk.MenuItem("Save")
 filesave.connect("activate", save_script)
 
-fileexport = gtk.MenuItem("Export STL")
+fileexport = Gtk.MenuItem("Export STL")
 fileexport.connect("activate", export_stl)
 
-fileexit = gtk.MenuItem("Exit")
-fileexit.connect("activate", gtk.main_quit)
+fileexit = Gtk.MenuItem("Exit")
+fileexit.connect("activate", Gtk.main_quit)
 
-filemenu = gtk.Menu()
+filemenu = Gtk.Menu()
 filemenu.append(filesave)
 filemenu.append(fileexport)
 filemenu.append(fileexit)
 
-filem = gtk.MenuItem("File")
+filem = Gtk.MenuItem("File")
 filem.set_submenu(filemenu)
 
-mb = gtk.MenuBar()
+mb = Gtk.MenuBar()
 mb.append(filem)
 
-vbox = gtk.VBox(False, 2)
+vbox = Gtk.VBox(False, 2)
 vbox.pack_start(mb, False, False, 0)
 vbox.add(hbox)
 
@@ -1786,4 +1787,4 @@ win.connect('key-release-event',keyreleaseevent)
 
 win.show_all()
 
-gtk.main()
+Gtk.main()
