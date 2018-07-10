@@ -862,7 +862,7 @@ def triangle_combine(faces):
 			if done == False:
 				break
 		if result[0] != result[-1]:
-			print "Polygon is not closed!"
+			print("Polygon is not closed!")
 			return
 		result.pop()
 		results.append(result)
@@ -1092,7 +1092,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 global ang_convert
 def ang_convert(span,steps):
 	if len(meshstack) == 0:
-        	message("No Object to convert")
+		message("No Object to convert")
 		return
 
 	obj=meshstack.pop()
@@ -1115,7 +1115,7 @@ def ang_convert(span,steps):
 			result = tmp
 		else:
 			result =pymesh.boolean(result,tmp,"union")
-        meshstack.append(result)
+		meshstack.append(result)
 
 
 ####
@@ -1275,15 +1275,15 @@ global CutPlanePlane
 def CutPlanePlane(p1,n1, p2,n2): # return list(pos, dir)
 	n3 = np.cross(n1,n2)
 	n3s=np.linalg.norm(n3)
-        if math.fabs(n3s) < 0.001:
-                return None,None
+	if math.fabs(n3s) < 0.001:
+		return None,None
 	n3 = n3/n3s
 
-        nx=np.cross(n1,n3)
-        p3=CutPlaneStraight(p2,n2,p1,nx)
+	nx=np.cross(n1,n3)
+	p3=CutPlaneStraight(p2,n2,p1,nx)
 	if p3 is None:
 		return None
-        return p3,n3
+	return p3,n3
 
 
 global size
@@ -1474,7 +1474,7 @@ def concat(n=2):
 global hull
 def hull():
 	if len(meshstack) == 0:
-        	message("No Object to hull")
+		message("No Object to hull")
 		return
 
 	obj=meshstack.pop()
@@ -1499,17 +1499,18 @@ def intersection(n=2):
 global collapse_short_edges
 def collapse_short_edges(eps):
 	if len(meshstack) == 0:
-        	message("No Object to collapse")
+		message("No Object to collapse")
 		return
 
 	obj=meshstack.pop()
 	obj,info = pymesh.collapse_short_edges(obj,eps)
 	meshstack.append(obj)
 
+	
 global split_long_edges
 def split_long_edges(eps):
 	if len(meshstack) == 0:
-        	message("No Object to split")
+		message("No Object to split")
 		return
 
 	obj=meshstack.pop()
