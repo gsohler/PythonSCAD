@@ -11,8 +11,8 @@ import xml.etree.ElementTree as ET
 import re
 import sys
 import struct
-import pyclipper
-import ezdxf
+# import pyclipper
+# import ezdxf
 from Bezier import *
 
 class Model:

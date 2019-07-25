@@ -1,5 +1,4 @@
 #! /usr/bin/python
-#! /home/gigl/anaconda3/bin/python
 
 # TODO achsen immer gleich hell
 # TODO profile verschieden viele segmente
