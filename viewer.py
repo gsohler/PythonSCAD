@@ -14,6 +14,7 @@
 # TODO extrude 2* mit wechselnden shapes
 # TODO gears
 # TODO cache for speedup
+# TODO vertices ueberall korrigieren
 
 import math
 import argparse
@@ -32,7 +33,7 @@ from OpenGL.GL import *
 import gobject
 import os.path
 import time
-from model import *
+#from model import *
 
 from csg.core import CSG
 from csg.geom import Vertex, Vector
@@ -40,6 +41,7 @@ from csg.geom import Vertex, Vector
 
 from OpenGL.GL import *
 
+listind = -1
 ####################################
 # Viewer
 ####################################
@@ -177,8 +179,10 @@ class Viewer:
 			ns.append([a for a in n])
 		self.vnormals = ns
 
-		self.list = glGenLists(1)
-       		glNewList(self.list, GL_COMPILE)
+                global listind
+                if listind == -1:
+    			listind = glGenLists(1)
+       		glNewList(listind, GL_COMPILE)
        	
        		for n, f in enumerate(self.faces):
 #       			glMaterialfv(GL_FRONT, GL_DIFFUSE, self.colors[n])
@@ -311,7 +315,9 @@ def draw(glarea, event):
 	# lower layers
 
 
-	glCallList(1)
+        global listind
+        if listind != -1:
+   	 	glCallList(listind)
 	
 	# disable depth for HUD
 	glDisable(GL_DEPTH_TEST)
@@ -572,7 +578,7 @@ def on_text_view_expose_event(text_view, event):
 meshstack = []
 
 global dump
-def dump():
+def dump(): # TODO
 	obj=meshstack[-1]
 	print("Vertices")
 	print(obj.vertices)
@@ -591,7 +597,7 @@ def dup(n=1):
 
 
 global square
-def square(s=1):
+def square(s=1): # TODO
 	if type(s) is not list:
 		w=s
 		l=s
@@ -615,7 +621,7 @@ def square(s=1):
 
 	meshstack.append(pymesh.form_mesh(vertices,faces))
 
-global circle	
+global circle	 # TODO
 def circle(r=1,n=10):
 	vertices = np.empty([n+1,2],dtype=float)
 	faces = np.empty([n,3],dtype=int)
@@ -629,7 +635,7 @@ def circle(r=1,n=10):
 
 	meshstack.append(pymesh.form_mesh(vertices,faces))
 
-global polygon
+global polygon # TODO
 def polygon(path):
 	n = len(path);
 	edges = np.array([np.arange(n), np.mod(np.arange(n)+1,n)]).T;
@@ -642,7 +648,7 @@ def polygon(path):
 	meshstack.append(tri.mesh)
 	
 global bezier
-def bezier(src,n):
+def bezier(src,n): # TODO
 	dst=[]
 	for i in range(n):
 		fact0=1.0*i/(n-1)
@@ -659,7 +665,7 @@ def bezier(src,n):
 	return dst
 
 global bezier_surface_sub
-def bezier_surface_sub(pts,x,y):
+def bezier_surface_sub(pts,x,y): # TODO
 	n=len(pts)
 	sumx=0
 	sumy=0
@@ -783,48 +789,50 @@ def bezier_surface(pts,n=5,zmin=-1):
 
 global cube	
 def cube(dim=[1,1,1]):
-#	cube=pymesh.generate_box_mesh([0,0,0],dim)
-        cube=CSG.cube()
-        print(cube)
-	meshstack.append(cube)
+        half=[dim[0]/2.0,dim[1]/2.0,dim[2]/2.0]
+        obj=CSG.cube(center=half,radius=half)
+	meshstack.append(obj)
 
 global sphere
 def sphere(r=1,center=[0,0,0],n=2):
-	meshstack.append(pymesh.generate_icosphere(r,center,refinement_order=n))
+        obj=CSG.sphere(center=center,radius=r)
+	meshstack.append(obj)
 
 global cylinder
-def cylinder(h=1,r=1,r1=None,r2=None,n=16):
-	if r1 is None:
-		r1=r
-	if r2 is None:
-		r2=r
-	meshstack.append(pymesh.generate_cylinder([0,0,0],[0,0,h],r1,r2,num_segments=n))
-
-global tube
-def tube(h=1,ro=1,ri=0.5,r1o=None,r2o=None,r1i=None,r2i=None,n=16):
-	if r1o is None:
-		r1o=ro
-	if r2o is None:
-		r2o=ro
-	if r1i is None:
-		r1i=ri
-	if r2i is None:
-		r2i=ri
-	meshstack.append(pymesh.generate_tube([0,0,0],[0,0,h],r1o,r2o,r1i,r2i,num_segments=n))
-
-global tetrahedron
-def tetrahedron(r=1):
-	meshstack.append(pymesh.generate_regular_tetrahedron(r))
-
-global dodecahedron
-def dodecahedron(r=1):
-	dod=pymesh.generate_dodecahedron(r,[0,0,0])
-	meshstack.append(dod)
-
-global import_obj
-def import_obj(filename):
-	obj=pymesh.load_mesh(filename)
+def cylinder(h=1,r=1,n=16):
+        obj = CSG.cylinder(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
 	meshstack.append(obj)
+
+global cone
+def cone(h=1,r=1,n=16):
+        obj = CSG.cone(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
+	meshstack.append(obj)
+
+# TODO
+#global tube
+#def tube(h=1,ro=1,ri=0.5,r1o=None,r2o=None,r1i=None,r2i=None,n=16):
+#	if r1o is None:
+#		r1o=ro
+#	if r2o is None:
+#		r2o=ro
+#	if r1i is None:
+#		r1i=ri
+#	if r2i is None:
+#		r2i=ri
+
+#global tetrahedron
+#def tetrahedron(r=1):
+#	meshstack.append(pymesh.generate_regular_tetrahedron(r))
+#
+#global dodecahedron
+#def dodecahedron(r=1):
+#	dod=pymesh.generate_dodecahedron(r,[0,0,0])
+#	meshstack.append(dod)
+#
+#global import_obj
+#def import_obj(filename):
+#	obj=pymesh.load_mesh(filename)
+#	meshstack.append(obj)
 
 
 ####
@@ -1144,39 +1152,9 @@ def translate(off):
 		return
 
 	obj=meshstack.pop()
-	dim=len(obj.vertices[0])
-	if dim == 3:	
-		xs=off[0]
-		if type(xs) is not list:
-			xs=[xs]
+        obj.translate(off)
+        meshstack.append(obj)
 
-		ys=off[1]
-		if type(ys) is not list:
-			ys=[ys]
-
-		zs=off[2]
-		if type(zs) is not list:
-			zs=[zs]
-
-		for z in zs:
-			for y in ys:
-				for x in xs:
-
-					vertices = np.empty([len(obj.vertices),dim],dtype=float)
-					for i in range(len(obj.vertices)):
-						vertices[i][0]=obj.vertices[i][0]+x
-						vertices[i][1]=obj.vertices[i][1]+y
-						vertices[i][2]=obj.vertices[i][2]+z
-					meshstack.append(pymesh.form_mesh(vertices,obj.faces))
-		union(len(xs)*len(ys)*len(zs))
-	elif dim == 2:
-		vertices = np.empty([len(obj.vertices),dim],dtype=float)
-		for i in range(len(obj.vertices)):
-			vertices[i][0]=obj.vertices[i][0]+off[0]
-			vertices[i][1]=obj.vertices[i][1]+off[1]
-		meshstack.append(pymesh.form_mesh(vertices,obj.faces))
-	else:
-		message("Dimension %d not supported"%(dim))
 
 global scale 
 def scale(s):
@@ -1206,53 +1184,13 @@ def scale(s):
 		message("Dimension %d not supported"%(dim))
 
 global rotate
-def rotate(rot):
+def rotate(axis,rot):
 	if len(meshstack) == 0:
 		message("No Object to rotate")
 		return
 	obj=meshstack.pop()
-	dim=len(obj.vertices[0])
-	if dim == 3:
-		rotmat = None
-		if rot[0] != 0:
-			xc=math.cos(rot[0]*math.pi/180)
-			xs=math.sin(rot[0]*math.pi/180)
-			rotmat = [[1,0,0],[0,xc,-xs],[0,xs,xc]]
-	
-		if rot[1] != 0:
-			yc=math.cos(rot[1]*math.pi/180)
-			ys=math.sin(rot[1]*math.pi/180)
-			rotmaty = [[yc,0,ys],[0,1,0],[-ys,0,yc]]
-			if rotmat is None:
-				rotmat=rotmaty
-			else:
-				rotmat = np.matmul(rotmat,rotmaty)
-
-		if rot[2] != 0:
-			zc=math.cos(rot[2]*math.pi/180)
-			zs=math.sin(rot[2]*math.pi/180)
-			rotmatz = [[zc,-zs,0],[zs,zc,0],[0,0,1]] 
-			if rotmat is None:
-				rotmat=rotmatz
-			else:
-				rotmat = np.matmul(rotmat,rotmatz)
-
-		if rotmat is None:
-			return
-		vertices = np.empty([len(obj.vertices),dim],dtype=float)
-		for i in range(len(obj.vertices)):
-			vertices[i]=np.matmul(obj.vertices[i],rotmat)
-		meshstack.append(pymesh.form_mesh(vertices,obj.faces))
-	elif dim == 2:
-		zc=math.cos(rot*math.pi/180)
-		zs=math.sin(rot*math.pi/180)
-		rotmat = [[zc,-zs],[zs,zc]] 
-		vertices = np.empty([len(obj.vertices),dim],dtype=float)
-		for i in range(len(obj.vertices)):
-			vertices[i]=np.matmul(obj.vertices[i],rotmat)
-		meshstack.append(pymesh.form_mesh(vertices,obj.faces))
-	else:
-		message("Dimension %d not supported"%(dim))
+        obj.rotate(axis,rot)
+        meshstack.append(obj)
 
 
 global mirror
@@ -1431,7 +1369,7 @@ def difference():
 		return
 	obj2=meshstack.pop()
 	obj1=meshstack.pop()
-	meshstack.append(pymesh.boolean(obj1,obj2,"difference"))
+	meshstack.append(obj1.inverse().union(obj2).inverse())
 
 global union
 def union(n=2):
@@ -1443,7 +1381,7 @@ def union(n=2):
 	obj1=meshstack.pop()
 	for i in range(n-1):
 		obj2=meshstack.pop()
-		obj1 =pymesh.boolean(obj1,obj2,"union")
+		obj1 =obj1.union(obj2)
 	meshstack.append(obj1)
 
 global concat
@@ -1507,31 +1445,8 @@ def intersection(n=2):
 	obj1=meshstack.pop()
 	for i in range(n-1):
 		obj2=meshstack.pop()
-		obj1 =pymesh.boolean(obj1,obj2,"intersection")
+		obj1 =obj1.intersect(obj2)
 	meshstack.append(obj1)
-
-# Cleanup
-
-global collapse_short_edges
-def collapse_short_edges(eps):
-	if len(meshstack) == 0:
-		message("No Object to collapse")
-		return
-
-	obj=meshstack.pop()
-	obj,info = pymesh.collapse_short_edges(obj,eps)
-	meshstack.append(obj)
-
-	
-global split_long_edges
-def split_long_edges(eps):
-	if len(meshstack) == 0:
-		message("No Object to split")
-		return
-
-	obj=meshstack.pop()
-	obj,info = pymesh.split_long_edges(obj,eps)
-	meshstack.append(obj)
 
 
 global volume
@@ -1569,7 +1484,7 @@ def volume():
 
 def render(window):
 	global meshstack
-	model.items = []
+#	model.items = []
 	meshstack = []
 
 	try:
@@ -1705,18 +1620,18 @@ tv.set_size_request(300, 600)
 tvscroll = gtk.ScrolledWindow()
 tvscroll.add(tv)
 
-model = Model()
+#model = Model()
 
-if args.file.endswith(".svg"):
-	model.loadSvg(args.file,args.scale)
-if args.file.endswith(".plt"):
-	model.loadPlt(args.file,args.scale)
-if args.file.endswith(".gcode"):
-	model.loadGcode(args.file)
-if args.file.endswith(".ngc"):
-	model.loadNgc(args.file)
-if args.file.endswith(".stl"):
-	model.loadStl(args.file,1.0,1.0,1.0)
+#if args.file.endswith(".svg"):
+#	model.loadSvg(args.file,args.scale)
+#if args.file.endswith(".plt"):
+#	model.loadPlt(args.file,args.scale)
+#if args.file.endswith(".gcode"):
+#	model.loadGcode(args.file)
+#if args.file.endswith(".ngc"):
+#	model.loadNgc(args.file)
+#if args.file.endswith(".stl"):
+#	model.loadStl(args.file,1.0,1.0,1.0)
 if args.file.endswith(".py"):
 	textbuffer = tv.get_buffer()
 	infile = open(args.file, "r")
@@ -1731,7 +1646,7 @@ if args.file.endswith(".py"):
 
 
 viewer = Viewer()
-viewer.setModel(model)
+#viewer.setModel(model)
 
 
 
