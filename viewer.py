@@ -33,7 +33,10 @@ import gobject
 import os.path
 import time
 from model import *
-import pymesh
+
+from csg.core import CSG
+from csg.geom import Vertex, Vector
+
 
 from OpenGL.GL import *
 
@@ -141,44 +144,60 @@ class Viewer:
 					self.raw_lines[layernum].append(item.center.z)
 					
 
-	def renderVertices(self):
-		self.raw_lines = []
-		self.raw_triangles = []
-		self.raw_triangles_normal=[]
+	def renderVertices(self,result):
+		self.faces = []
+		self.normals = []
+		self.vertices = []
+		self.colors = []
+		self.vnormals = []
+                polygons=result.toPolygons()
+        	
+		for polygon in polygons:
+			n = polygon.plane.normal
+			indices = []
+			for v in polygon.vertices:
+				pos = [v.pos.x, v.pos.y, v.pos.z]
+				if not pos in self.vertices:
+					self.vertices.append(pos)
+					self.vnormals.append([])
+				index = self.vertices.index(pos)
+				indices.append(index)
+				self.vnormals[index].append(v.normal)
+			self.faces.append(indices)
+			self.normals.append([n.x, n.y, n.z])
+			self.colors.append(polygon.shared)
 
-		self.renderLines(self.model.items)
-		for path in self.model.pathes:
-			self.renderLines(path)
-	
-		
-		self.lines = [];
+		# setup vertex-normals
+		ns = []
+		for vns in self.vnormals:
+			n = Vector(0.0, 0.0, 0.0)
+			for vn in vns:
+				n = n.plus(vn)
+			n = n.dividedBy(len(vns))
+			ns.append([a for a in n])
+		self.vnormals = ns
 
-		self.call_lists = [];
-		for ind in range(len(self.raw_triangles)): # Anzahl der layer
-			data_tri = self.raw_triangles[ind]
-			data_normal = self.raw_triangles_normal[ind]
-			data_lines = self.raw_lines[ind]
-			listind = glGenLists(1)
-			glNewList(listind, GL_COMPILE)
-			glBegin(GL_TRIANGLES)
-			for i in range(len(data_tri)/3):
-				glColor3f(0.8,0.8,0)
-				glNormal3f(data_normal[3*i+0], data_normal[3*i+1], data_normal[3*i+2])
-				glVertex3f(data_tri[3*i+0], data_tri[3*i+1], data_tri[3*i+2])
-			glEnd()
+		self.list = glGenLists(1)
+       		glNewList(self.list, GL_COMPILE)
+       	
+       		for n, f in enumerate(self.faces):
+#       			glMaterialfv(GL_FRONT, GL_DIFFUSE, self.colors[n])
+#       			glMaterialfv(GL_FRONT, GL_SPECULAR, self.colors[n])
+       			glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
+#       			glColor4fv(self.colors[n])
+       	
+       			glBegin(GL_POLYGON)
+                        glColor3f(0.8,0.8,0)
+#       			if self.colors[n][0] > 0:
+                        glNormal3fv(self.normals[n])
+#	
+	       		for i in f:
+#       				if self.colors[n][1] > 0:
+#				glNormal3fv(self.vnormals[i])
+       				glVertex3fv(self.vertices[i])
+	                glEnd()
+       		glEndList()
 
-			glBegin(GL_LINES)
-			for i in range(len(data_lines)/3):
-				glVertex3f(data_lines[3*i+0], data_lines[3*i+1], data_lines[3*i+2])
-			glEnd()
-			
-			glEndList()
-	
-			self.call_lists.append(listind)
-	
-		self.layer_num = len(self.call_lists)
-		self.start_layer=0
-		self.end_layer = self.layer_num-1
 
 
 
@@ -292,10 +311,7 @@ def draw(glarea, event):
 	# lower layers
 
 
-	for i in range(viewer.end_layer-viewer.start_layer+1):
-#		viewer.lines[viewer.start_layer+i].draw(GL_LINES)
-		glColor3f(0,1,0)
-		glCallList(viewer.call_lists[viewer.start_layer+i])
+	glCallList(1)
 	
 	# disable depth for HUD
 	glDisable(GL_DEPTH_TEST)
@@ -313,7 +329,7 @@ def draw(glarea, event):
 	glEnable(GL_DEPTH_TEST)
 	glDepthMask(1)
 
-
+    
 	if gldrawable.is_double_buffered():
 		gldrawable.swap_buffers()
 	else:
@@ -505,7 +521,7 @@ def init(glarea):
 
 	gldrawable.gl_end()
 
-	viewer.renderVertices()
+#	viewer.renderVertices()
 
 def message(str):
 	global win
@@ -517,7 +533,6 @@ def message(str):
 	md.destroy()
 ####################################
 # MyTextView
-w
 ####################################
 
 class MyTextView(gtk.TextView):
@@ -768,7 +783,9 @@ def bezier_surface(pts,n=5,zmin=-1):
 
 global cube	
 def cube(dim=[1,1,1]):
-	cube=pymesh.generate_box_mesh([0,0,0],dim)
+#	cube=pymesh.generate_box_mesh([0,0,0],dim)
+        cube=CSG.cube()
+        print(cube)
 	meshstack.append(cube)
 
 global sphere
@@ -1562,65 +1579,56 @@ def render(window):
 	except Exception:
 		message("Error in Script")
 		traceback.print_exc()
-		viewer.renderVertices()
+#		viewer.renderVertices()
 		return
 
 	if len(meshstack) == 0:
 		message( "Error: No Objects generated")
-		viewer.renderVertices()
+#		viewer.renderVertices()
 		return
 
 	if(len(meshstack) > 1):
 		union(len(meshstack))
 
 	mesh=meshstack.pop()
-	if len(mesh.vertices) == 0:
-		viewer.renderVertices()
-		return
+#	if len(mesh) == 0:
+#		viewer.renderVertices()
+#		return
 
-	if len(mesh.vertices[0]) == 2:
-		meshstack.append(mesh)
-		linear_extrude(1)
-		mesh=meshstack[0]
-	meshstack.append(mesh)
+#	if len(mesh.vertices[0]) == 2:
+#		meshstack.append(mesh)
+#		linear_extrude(1)
+#		mesh=meshstack[0]
+#	meshstack.append(mesh)
 
 
-	if len(mesh.vertices[0]) != 3:
-		message( "Not a a 3D Object")
-		viewer.renderVertices()
-		return
+#	if len(mesh.vertices[0]) != 3:
+#		message( "Not a a 3D Object")
+#		viewer.renderVertices()
+#		return
 
-	ptmin = [ mesh.vertices[0][0],mesh.vertices[0][1], mesh.vertices[0][2] ]
-	ptmax = [ mesh.vertices[0][0],mesh.vertices[0][1], mesh.vertices[0][2] ]
-	for pt in mesh.vertices:
-		if pt[0] > ptmax[0]:
-			ptmax[0] = pt[0]
-		if pt[0] < ptmin[0]:
-			ptmin[0] = pt[0]
-		if pt[1] > ptmax[1]:
-			ptmax[1] = pt[1]
-		if pt[1] < ptmin[1]:
-			ptmin[1] = pt[1]
-		if pt[2] > ptmax[2]:
-			ptmax[2] = pt[2]
-		if pt[2] < ptmin[2]:
-			ptmin[2] = pt[2]
+        polygons=mesh.toPolygons()
+	ptmin = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
+	ptmax = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
+        for poly in polygons:
+		for pt in poly.vertices:
+			if pt.pos.x > ptmax[0]:
+				ptmax[0] = pt.pos.x
+			if pt.pos.x < ptmin[0]:
+				ptmin[0] = pt.pos.x
+	
+			if pt.pos.y > ptmax[1]:
+				ptmax[1] = pt.pos.y
+			if pt.pos.y < ptmin[1]:
+				ptmin[1] = pt.pos.y
+	
+			if pt.pos.z > ptmax[2]:
+				ptmax[2] = pt.pos.z
+			if pt.pos.z < ptmin[2]:
+				ptmin[2] = pt.pos.z
+
 	print("Dimension [%g %g %g]\n"%(ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2]))
-	v = mesh.vertices;
-	mesh.add_attribute("face_normal")
-	norms=mesh.get_face_attribute("face_normal")
-	for i in range(len(mesh.faces)):
-		face=mesh.faces[i]
-		n = norms[i]
-		n = Model.Point(n[0],n[1],n[2])
-		for i in range(len(face)-2):
-			tri = Model.Triangle(
-				model.Point(v[face[0]][0],v[face[0]][1],v[face[0]][2]),
-				model.Point(v[face[i+1]][0],v[face[i+1]][1],v[face[i+1]][2]),
-				model.Point(v[face[i+2]][0],v[face[i+2]][1],v[face[i+2]][2]),
-				n)
-			model.items.append(tri)
-	viewer.renderVertices()
+	viewer.renderVertices(mesh)
 	
 
 
@@ -1786,3 +1794,5 @@ win.connect('key-release-event',keyreleaseevent)
 win.show_all()
 
 gtk.main()
+# vim: softtabstop=8 noexpandtab
+
