@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 # TODO achsen immer gleich hell
 # TODO profile verschieden viele segmente
@@ -20,7 +20,7 @@ import math
 import argparse
 import sys
 import signal
-import numpy as np
+#import numpy as np
 
 import pygtk
 pygtk.require('2.0')
@@ -58,10 +58,10 @@ class Viewer:
 
 	def setModel(self, model):
 		self.model = model
-	
-		
+
+
 	def renderLines(self,items):
-		
+
 		for item in items:
 			if hasattr(item,'layernum'):
 				layernum = item.layernum
@@ -121,7 +121,7 @@ class Viewer:
 				if ang2 < ang1:
 					ang2  = ang2 + 2*3.14159265359
 
-		
+
 				n = int((ang2-ang1)/0.3)+1
 				for i in range(n):
 					p1 = ang1+(ang2-ang1)*i/n
@@ -133,7 +133,7 @@ class Viewer:
 					self.raw_lines[layernum].append(item.center.y+item.radius*math.sin(p2))
 					self.raw_lines[layernum].append(item.center.z)
 			if isinstance(item, Model.Circle):
-		
+
 				n = 16
 				for i in range(n):
 					p1 = 2*3.1415*i/n
@@ -144,7 +144,7 @@ class Viewer:
 					self.raw_lines[layernum].append(item.center.x+item.radius*math.cos(p2))
 					self.raw_lines[layernum].append(item.center.y+item.radius*math.sin(p2))
 					self.raw_lines[layernum].append(item.center.z)
-					
+
 
 	def renderVertices(self,result):
 		self.faces = []
@@ -152,8 +152,8 @@ class Viewer:
 		self.vertices = []
 		self.colors = []
 		self.vnormals = []
-                polygons=result.toPolygons()
-        	
+		polygons=result.toPolygons()
+
 		for polygon in polygons:
 			n = polygon.plane.normal
 			indices = []
@@ -179,28 +179,21 @@ class Viewer:
 			ns.append([a for a in n])
 		self.vnormals = ns
 
-                global listind
-                if listind == -1:
-    			listind = glGenLists(1)
-       		glNewList(listind, GL_COMPILE)
-       	
-       		for n, f in enumerate(self.faces):
-#       			glMaterialfv(GL_FRONT, GL_DIFFUSE, self.colors[n])
-#       			glMaterialfv(GL_FRONT, GL_SPECULAR, self.colors[n])
-       			glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
-#       			glColor4fv(self.colors[n])
-       	
-       			glBegin(GL_POLYGON)
-                        glColor3f(0.8,0.8,0)
-#       			if self.colors[n][0] > 0:
-                        glNormal3fv(self.normals[n])
-#	
-	       		for i in f:
-#       				if self.colors[n][1] > 0:
-#				glNormal3fv(self.vnormals[i])
-       				glVertex3fv(self.vertices[i])
-	                glEnd()
-       		glEndList()
+		global listind
+		if listind == -1:
+			listind = glGenLists(1)
+		glNewList(listind, GL_COMPILE)
+
+		for n, f in enumerate(self.faces):
+			glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
+
+			glBegin(GL_POLYGON)
+			glColor3f(0.8,0.8,0)
+			glNormal3fv(self.normals[n])
+			for i in f:
+				glVertex3fv(self.vertices[i])
+			glEnd()
+		glEndList()
 
 
 
@@ -265,24 +258,24 @@ def draw(glarea, event):
 	# GL calls
 	if not gldrawable.gl_begin(glcontext): return
 
-	
+
 	# Clear buffers
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-	
+
 	# setup projection
 	glMatrixMode(GL_PROJECTION)
 	glLoadIdentity()
 	gluPerspective(65, width / float(height), 0.1, 1000)
-	
+
 	# setup camera
 	glMatrixMode(GL_MODELVIEW)
 	glLoadIdentity()
 	gluLookAt(0,1.5,2,0,0,0,0,1,0)
-	
+
 	# enable alpha blending
 #	glEnable(GL_BLEND)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-	
+
 	# rotate axes to match reprap style
 	glRotated(-90, 1,0,0)
 
@@ -307,24 +300,24 @@ def draw(glarea, event):
 
 
 	# fit & user zoom model
-	
+
 	glColor3f(1,1,1)
-	
+
 	glLineWidth(1)
 	# Draw the model layers
 	# lower layers
 
 
-        global listind
-        if listind != -1:
-   	 	glCallList(listind)
-	
+	global listind
+	if listind != -1:
+		glCallList(listind)
+
 	# disable depth for HUD
 	glDisable(GL_DEPTH_TEST)
 	glDepthMask(0)
-	
+
 	#Set your camera up for 2d, draw 2d scene
-	
+
 	glMatrixMode(GL_PROJECTION)
 	glLoadIdentity();
 	glOrtho(0, width, 0, height, -1, 1)
@@ -335,12 +328,12 @@ def draw(glarea, event):
 	glEnable(GL_DEPTH_TEST)
 	glDepthMask(1)
 
-    
+
 	if gldrawable.is_double_buffered():
 		gldrawable.swap_buffers()
 	else:
 		glFlush()
-	
+
 		gldrawable.gl_end()
 	return True
 
@@ -348,12 +341,12 @@ def reshape(glarea, event):
 	# get GLContext and GLDrawable
 	glcontext = glarea.get_gl_context()
 	gldrawable = glarea.get_gl_drawable()
-	
+
 	# GL calls
 	if not gldrawable.gl_begin(glcontext): return
-	
+
 	x, y, width, height = glarea.get_allocation()
-	
+
 	glViewport(0, 0, width, height)
 	glMatrixMode(GL_PROJECTION)
 	glLoadIdentity()
@@ -366,9 +359,9 @@ def reshape(glarea, event):
 	glMatrixMode(GL_MODELVIEW)
 	glLoadIdentity()
 	glTranslatef(0.0, 0.0, -40.0)
-	
+
 	gldrawable.gl_end()
-	
+
 	return True
 
 def keypressevent(window, event):
@@ -407,10 +400,10 @@ def pointermotion(glarea, event):
 
 		if button_pressed == 3:
 			viewer.pan_drag_do(event.x, event.y, dx, dy, button_pressed, modifiers)
-	
+
 	if modifiers == 1:
 		dy = int(dy)
-		
+
 		if button_pressed == 1 or button_pressed == 2:
 			viewer.start_layer = viewer.start_layer + dy
 			if viewer.start_layer < 0:
@@ -461,8 +454,8 @@ def buttonpress(glarea, event):
 	if modifiers == 0:
 		if event.button == 1:
 			viewer.rotate_drag_start(event.x, event.y, event.button, modifiers)
-	
-		if event.button == 3:			
+
+		if event.button == 3:
 			viewer.pan_drag_start(event.x, event.y, event.button, modifiers)
 
 
@@ -474,7 +467,7 @@ def buttonrelease(glarea, event):
 	if event.button == 1:
 		viewer.rotate_drag_end(event.x, event.y, event.button, modifiers)
 
-	if event.button == 3:			
+	if event.button == 3:
 		viewer.pan_drag_end(event.x, event.y, event.button, modifiers)
 	button_pressed = 0
 
@@ -484,7 +477,7 @@ def init(glarea):
 	# get GLContext and GLDrawable
 	glcontext = glarea.get_gl_context()
 	gldrawable = glarea.get_gl_drawable()
-	
+
 	# GL calls
 	if not gldrawable.gl_begin(glcontext): return
 
@@ -498,7 +491,7 @@ def init(glarea):
 	#lPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 
 	# Simple light setup.  On Windows GL_LIGHT0 is enabled by default,
-	# but this is not the case on Linux or Mac, so remember to always 
+	# but this is not the case on Linux or Mac, so remember to always
 	# include it.
 	glEnable(GL_LIGHTING)
 	glEnable(GL_LIGHT0)
@@ -532,8 +525,8 @@ def init(glarea):
 def message(str):
 	global win
 	parent = None
-	md = gtk.MessageDialog(win, 
-		gtk.DIALOG_DESTROY_WITH_PARENT, gtk.MESSAGE_INFO, 
+	md = gtk.MessageDialog(win,
+		gtk.DIALOG_DESTROY_WITH_PARENT, gtk.MESSAGE_INFO,
 	    gtk.BUTTONS_OK, str)
 	md.run()
 	md.destroy()
@@ -646,7 +639,7 @@ def polygon(path):
 	tri.verbosity = 0
 	tri.run()
 	meshstack.append(tri.mesh)
-	
+
 global bezier
 def bezier(src,n): # TODO
 	dst=[]
@@ -684,7 +677,7 @@ def bezier_surface_sub(pts,x,y): # TODO
 			sumy =sumy + pts[row][col][1] * fr[row]*fc[col]
 			sumz =sumz  + pts[row][col][2] * fr[row]*fc[col]
 
-	
+
 	return([sumx,sumy,sumz])
 
 global bezier_surface
@@ -715,7 +708,7 @@ def bezier_surface(pts,n=5,zmin=-1):
 	vertoff=vertoff+(n-1)*(n-1)
 
 	if ground == 1:
-		sockeltop=[]	
+		sockeltop=[]
 		sockel=[]
 		#sockel
 		# x+
@@ -784,28 +777,28 @@ def bezier_surface(pts,n=5,zmin=-1):
 
 			faces[faceoffset]=[sockel[(i+1)%l],sockel[i],ci]
 			faceoffset=faceoffset+1
-	
+
 	meshstack.append(pymesh.form_mesh(vertices,faces))
 
-global cube	
+global cube
 def cube(dim=[1,1,1]):
-        half=[dim[0]/2.0,dim[1]/2.0,dim[2]/2.0]
-        obj=CSG.cube(center=half,radius=half)
+	half=[dim[0]/2.0,dim[1]/2.0,dim[2]/2.0]
+	obj=CSG.cube(center=half,radius=half)
 	meshstack.append(obj)
 
 global sphere
 def sphere(r=1,center=[0,0,0],n=2):
-        obj=CSG.sphere(center=center,radius=r)
+	obj=CSG.sphere(center=center,radius=r)
 	meshstack.append(obj)
 
 global cylinder
 def cylinder(h=1,r=1,n=16):
-        obj = CSG.cylinder(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
+	obj = CSG.cylinder(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
 	meshstack.append(obj)
 
 global cone
 def cone(h=1,r=1,n=16):
-        obj = CSG.cone(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
+	obj = CSG.cone(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
 	meshstack.append(obj)
 
 # TODO
@@ -876,7 +869,7 @@ def triangle_combine(faces):
 			done=False
 			for i in range(n):
 				if edge_sea[i] is None:
-					continue	
+					continue
 				if edge_sea[i][0] == ind:
 					ind=edge_sea[i][1]
 					edge_sea[i]=None
@@ -924,7 +917,7 @@ def extrude_finish_link(vertices,faces,p1x,p2x,faceoff,off):
 #		ang2=extrude_finish_angle(vertices,faces,faceoff,1,2,0)
 #		print(ang1,ang2)
 		faceoff=faceoff+1
-				
+
 		i1=i1+1
 		i2=i2+1
 
@@ -967,10 +960,10 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
 				p2x=p2[i]
 
 				off=0
-				extrude_finish_link(vertices,faces,p1x,p2x,faceoff,off)	
+				extrude_finish_link(vertices,faces,p1x,p2x,faceoff,off)
 				faceoff += len(p1x)+len(p2x)
-	
-					
+
+
 
 	if nd == 4:
 
@@ -1002,7 +995,7 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
 					faceoff=faceoff+1
 					i1=i1+1
 					i2=i2+1
-	
+
 
 	meshstack.append(pymesh.form_mesh(vertices,faces))
 
@@ -1080,7 +1073,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 		layers = layers-1
 	a1=a1*math.pi/180
 	a2=a2*math.pi/180
-	
+
 
 	# Generate Points
 	vertice_off=0
@@ -1098,7 +1091,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 			else:
 				if nv != len(obj.vertices):
 					message("Vertices of object must be constant!")
-	
+
 		for i in range(nv):
 			vertices[vertice_off+i][0]=obj.vertices[i][0]*math.cos(a2-(a2-a1)*j/conns)
 			vertices[vertice_off+i][1]=obj.vertices[i][0]*math.sin(a2-(a2-a1)*j/conns)
@@ -1152,11 +1145,11 @@ def translate(off):
 		return
 
 	obj=meshstack.pop()
-        obj.translate(off)
-        meshstack.append(obj)
+	obj.translate(off)
+	meshstack.append(obj)
 
 
-global scale 
+global scale
 def scale(s):
 	if len(meshstack) == 0:
 		message("No Object to scale")
@@ -1189,8 +1182,8 @@ def rotate(axis,rot):
 		message("No Object to rotate")
 		return
 	obj=meshstack.pop()
-        obj.rotate(axis,rot)
-        meshstack.append(obj)
+	obj.rotate(axis,rot)
+	meshstack.append(obj)
 
 
 global mirror
@@ -1219,11 +1212,11 @@ def mirror(v):
 
 global CutPlaneStraight
 def CutPlaneStraight(plpos,pldir,s,sd): # Flaeche mit Gerade  s, s-dir schneiden: punkt
-        h =np.dot(pldir,sd) 
-        if math.fabs(h) < 0.001:
-                return None
-        q=(np.dot(pldir,plpos)-np.dot(pldir,s))/h  
-        return s + ( sd * q )
+	h =np.dot(pldir,sd)
+	if math.fabs(h) < 0.001:
+		return None
+	q=(np.dot(pldir,plpos)-np.dot(pldir,s))/h
+	return s + ( sd * q )
 
 global CutPlanePlane
 def CutPlanePlane(p1,n1, p2,n2): # return list(pos, dir)
@@ -1286,9 +1279,9 @@ def size(s=1.0):
 		ref1 = refs.pop()
 
 		vertices[i] = ref1 # better fallback
-				
+
 		#  2 ebenen schneiden/widerholen
-		while True:		
+		while True:
 			if len(dirs) == 0:
 				sp = None
 				break
@@ -1359,7 +1352,7 @@ def back():
 	cube([2000,1000,2000])
 	translate([-1000,-1000,-1000])
 	intersection()
-	
+
 ####
 
 global difference
@@ -1522,21 +1515,21 @@ def render(window):
 #		viewer.renderVertices()
 #		return
 
-        polygons=mesh.toPolygons()
+	olygons=mesh.toPolygons()
 	ptmin = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
 	ptmax = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
-        for poly in polygons:
+	for poly in polygons:
 		for pt in poly.vertices:
 			if pt.pos.x > ptmax[0]:
 				ptmax[0] = pt.pos.x
 			if pt.pos.x < ptmin[0]:
 				ptmin[0] = pt.pos.x
-	
+
 			if pt.pos.y > ptmax[1]:
 				ptmax[1] = pt.pos.y
 			if pt.pos.y < ptmin[1]:
 				ptmin[1] = pt.pos.y
-	
+
 			if pt.pos.z > ptmax[2]:
 				ptmax[2] = pt.pos.z
 			if pt.pos.z < ptmin[2]:
@@ -1544,7 +1537,7 @@ def render(window):
 
 	print("Dimension [%g %g %g]\n"%(ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2]))
 	viewer.renderVertices(mesh)
-	
+
 
 
 def save_script(window):
@@ -1561,7 +1554,7 @@ def export_stl(window):
 		message( "Error: No Objects generated")
 		viewer.renderVertices()
 		return
-	mesh = meshstack[0] 
+	mesh = meshstack[0]
 	text_filter=gtk.FileFilter()
 	text_filter.set_name("Text files")
 	text_filter.add_mime_type("text/*")
@@ -1572,12 +1565,12 @@ def export_stl(window):
 	filename=None
 	dialog=gtk.FileChooserDialog(title="Select a File", action=gtk.FILE_CHOOSER_ACTION_SAVE,
 		buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK))
-	
+
 	dialog.add_filter(text_filter)
 	dialog.add_filter(all_filter)
-	
+
 	response = dialog.run()
-	
+
 	if response == gtk.RESPONSE_OK:
 		filename = dialog.get_filename()
 		pymesh.save_mesh(filename, mesh);
