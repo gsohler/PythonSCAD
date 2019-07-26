@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/python
 
 # TODO achsen immer gleich hell
 # TODO profile verschieden viele segmente
