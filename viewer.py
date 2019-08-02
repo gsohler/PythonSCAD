@@ -20,511 +20,50 @@ import math
 import argparse
 import sys
 import signal
-#import numpy as np
+import numpy as np
 
 import gi
 gi.require_version('Gtk','3.0')
 from gi.repository import Gtk
-#pygtk.require('2.0')
-#import gtk
-#import pango
-#import gtk.gtkgl
-from OpenGL.GLUT import *
-from OpenGL.GLU import *
-from OpenGL.GL import *
-import gobject
-import os.path
-import time
-#from model import *
 
 from csg.core import CSG
 from csg.geom import Vertex, Vector
 
-
-from OpenGL.GL import *
+from My3DViewer import *
 
 listind = -1
 ####################################
 # Viewer
 ####################################
 
-class Viewer:
-	def __init__(self):
-		self.RX = 0.0
-		self.RZ = 0.0
-		self.PX = 0.0
-		self.PY = 0.0
-		self.zoom = 0.05
-		self.start_layer = 0
-		self.end_layer = -1
-
-	def setModel(self, model):
-		self.model = model
-
-
-	def renderLines(self,items):
-
-		for item in items:
-			if hasattr(item,'layernum'):
-				layernum = item.layernum
-			else:
-				layernum = 0
-			while len(self.raw_lines) <= layernum:
-				self.raw_lines.append([])
-
-			while len(self.raw_triangles) <= layernum:
-				self.raw_triangles.append([])
-
-			while len(self.raw_triangles_normal) <= layernum:
-				self.raw_triangles_normal.append([])
-
-
-			if isinstance(item, Model.Line):
-				item.start.x
-				item.start.y
-				item.start.z
-				item.end.x
-				item.end.y
-				item.end.z
-				self.raw_lines[layernum].append(item.start.x)
-				self.raw_lines[layernum].append(item.start.y)
-				self.raw_lines[layernum].append(item.start.z)
-				self.raw_lines[layernum].append(item.end.x)
-				self.raw_lines[layernum].append(item.end.y)
-				self.raw_lines[layernum].append(item.end.z)
-			if isinstance(item, Model.Triangle):
-				self.raw_triangles[layernum].append(item.p1.x)
-				self.raw_triangles[layernum].append(item.p1.y)
-				self.raw_triangles[layernum].append(item.p1.z)
-				self.raw_triangles[layernum].append(item.p2.x)
-				self.raw_triangles[layernum].append(item.p2.y)
-				self.raw_triangles[layernum].append(item.p2.z)
-				self.raw_triangles[layernum].append(item.p3.x)
-				self.raw_triangles[layernum].append(item.p3.y)
-				self.raw_triangles[layernum].append(item.p3.z)
-				self.raw_triangles_normal[layernum].append(item.n.x)
-				self.raw_triangles_normal[layernum].append(item.n.y)
-				self.raw_triangles_normal[layernum].append(item.n.z)
-				self.raw_triangles_normal[layernum].append(item.n.x)
-				self.raw_triangles_normal[layernum].append(item.n.y)
-				self.raw_triangles_normal[layernum].append(item.n.z)
-				self.raw_triangles_normal[layernum].append(item.n.x)
-				self.raw_triangles_normal[layernum].append(item.n.y)
-				self.raw_triangles_normal[layernum].append(item.n.z)
-			if isinstance(item, Model.Arc):
-				d1 = Model.Point(item.start.x - item.center.x, item.start.y - item.center.y,0)
-				d2 = Model.Point(item.end.x - item.center.x, item.end.y - item.center.y,0)
-				ang1=math.atan2( d1.y,d1.x)
-				ang2=math.atan2( d2.y,d2.x)
-				if item.ccw == False:
-					x=ang1
-					ang1=ang2
-					ang2=x
-				if ang2 < ang1:
-					ang2  = ang2 + 2*3.14159265359
-
-
-				n = int((ang2-ang1)/0.3)+1
-				for i in range(n):
-					p1 = ang1+(ang2-ang1)*i/n
-					p2 = ang1+(ang2-ang1)*(i+1)/n
-					self.raw_lines[layernum].append(item.center.x+item.radius*math.cos(p1))
-					self.raw_lines[layernum].append(item.center.y+item.radius*math.sin(p1))
-					self.raw_lines[layernum].append(item.center.z)
-					self.raw_lines[layernum].append(item.center.x+item.radius*math.cos(p2))
-					self.raw_lines[layernum].append(item.center.y+item.radius*math.sin(p2))
-					self.raw_lines[layernum].append(item.center.z)
-			if isinstance(item, Model.Circle):
-
-				n = 16
-				for i in range(n):
-					p1 = 2*3.1415*i/n
-					p2 = 2*3.1415*(i+1)/n
-					self.raw_lines[layernum].append(item.center.x+item.radius*math.cos(p1))
-					self.raw_lines[layernum].append(item.center.y+item.radius*math.sin(p1))
-					self.raw_lines[layernum].append(item.center.z)
-					self.raw_lines[layernum].append(item.center.x+item.radius*math.cos(p2))
-					self.raw_lines[layernum].append(item.center.y+item.radius*math.sin(p2))
-					self.raw_lines[layernum].append(item.center.z)
-
-
-	def renderVertices(self,result):
-		self.faces = []
-		self.normals = []
-		self.vertices = []
-		self.colors = []
-		self.vnormals = []
-		polygons=result.toPolygons()
-
-		for polygon in polygons:
-			n = polygon.plane.normal
-			indices = []
-			for v in polygon.vertices:
-				pos = [v.pos.x, v.pos.y, v.pos.z]
-				if not pos in self.vertices:
-					self.vertices.append(pos)
-					self.vnormals.append([])
-				index = self.vertices.index(pos)
-				indices.append(index)
-				self.vnormals[index].append(v.normal)
-			self.faces.append(indices)
-			self.normals.append([n.x, n.y, n.z])
-			self.colors.append(polygon.shared)
-
-		# setup vertex-normals
-		ns = []
-		for vns in self.vnormals:
-			n = Vector(0.0, 0.0, 0.0)
-			for vn in vns:
-				n = n.plus(vn)
-			n = n.dividedBy(len(vns))
-			ns.append([a for a in n])
-		self.vnormals = ns
-
-		global listind
-		if listind == -1:
-			listind = glGenLists(1)
-		glNewList(listind, GL_COMPILE)
-
-		for n, f in enumerate(self.faces):
-			glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
-
-			glBegin(GL_POLYGON)
-			glColor3f(0.8,0.8,0)
-			glNormal3fv(self.normals[n])
-			for i in f:
-				glVertex3fv(self.vertices[i])
-			glEnd()
-		glEndList()
-
-
-
-
-	def rotate_drag_start(self, x, y, button, modifiers):
-		self.rotateDragStartRX = viewer.RX
-		self.rotateDragStartRZ = viewer.RZ
-		self.rotateDragStartX = x
-		self.rotateDragStartY = y
-
-
-	def rotate_drag_do(self, x, y, dx, dy, buttons, modifiers):
-		# deltas
-		deltaX = x - self.rotateDragStartX
-		deltaY = y - self.rotateDragStartY
-		# rotate!
-		self.RZ = self.rotateDragStartRZ + deltaX/5.0 # mouse X bound to model Z
-		self.RX = self.rotateDragStartRX + deltaY/5.0 # mouse Y bound to model X
-
-
-	def rotate_drag_end(self, x, y, button, modifiers):
-		self.rotateDragStartRX = None
-		self.rotateDragStartRZ = None
-		self.rotateDragStartX = None
-		self.rotateDragStartY = None
-
-
-	def pan_drag_start(self, x, y, button, modifiers):
-		self.panDragStartPX = viewer.PX
-		self.panDragStartPY = viewer.PY
-		self.panDragStartX = x
-		self.panDragStartY = y
-
-
-	def pan_drag_do(self, x, y, dx, dy, buttons, modifiers):
-		pass
-		# deltas
-		deltaX = x - self.panDragStartX
-		deltaY = y - self.panDragStartY
-		# rotate!
-		self.PX = self.panDragStartPX + deltaX*0.02
-		self.PY = self.panDragStartPY + deltaY*0.02
-
-
-	def pan_drag_end(self, x, y, button, modifiers):
-		self.panDragStartPX = None
-		self.panDragStartPY = None
-		self.panDragStartX = None
-		self.panDragStartY = None
-
-####################################
-# Viewer ewvents
-####################################
-
-
-def draw(glarea, event):
-	# get GLContext and GLDrawable
-	glcontext = glarea.get_gl_context()
-	gldrawable = glarea.get_gl_drawable()
-	x, y, width, height = glarea.get_allocation()
-
-	# GL calls
-	if not gldrawable.gl_begin(glcontext): return
-
-
-	# Clear buffers
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
-	# setup projection
-	glMatrixMode(GL_PROJECTION)
-	glLoadIdentity()
-	gluPerspective(65, width / float(height), 0.1, 1000)
-
-	# setup camera
-	glMatrixMode(GL_MODELVIEW)
-	glLoadIdentity()
-	gluLookAt(0,1.5,2,0,0,0,0,1,0)
-
-	# enable alpha blending
-#	glEnable(GL_BLEND)
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-	# rotate axes to match reprap style
-	glRotated(-90, 1,0,0)
-
-	glNormal3f(1,0,0)
-	glTranslated(viewer.PX,viewer.PY,-0.5)
-	# user rotate model
-	glRotated(-viewer.RX, 1,0,0)
-	glRotated(viewer.RZ, 0,0,1)
-
-	# draw axes
-	glBegin(GL_LINES)
-	glColor3f(1,0,0)
-	glVertex2i(0,0); glVertex2i(1,0)
-	glColor3f(0,1,0)
-	glVertex2i(0,0); glVertex2i(0,1)
-	glColor3f(0,0,1)
-	glVertex2i(0,0); glVertex3i(0,0,1)
-	glEnd()
-
-	scale = viewer.zoom ;
-	glScaled(scale, scale, scale)
-
-
-	# fit & user zoom model
-
-	glColor3f(1,1,1)
-
-	glLineWidth(1)
-	# Draw the model layers
-	# lower layers
-
-
-	global listind
-	if listind != -1:
-		glCallList(listind)
-
-	# disable depth for HUD
-	glDisable(GL_DEPTH_TEST)
-	glDepthMask(0)
-
-	#Set your camera up for 2d, draw 2d scene
-
-	glMatrixMode(GL_PROJECTION)
-	glLoadIdentity();
-	glOrtho(0, width, 0, height, -1, 1)
-	glMatrixMode(GL_MODELVIEW)
-	glLoadIdentity()
-
-	# reenable depth for next model display
-	glEnable(GL_DEPTH_TEST)
-	glDepthMask(1)
-
-
-	if gldrawable.is_double_buffered():
-		gldrawable.swap_buffers()
-	else:
-		glFlush()
-
-		gldrawable.gl_end()
-	return True
-
-def reshape(glarea, event):
-	# get GLContext and GLDrawable
-	glcontext = glarea.get_gl_context()
-	gldrawable = glarea.get_gl_drawable()
-
-	# GL calls
-	if not gldrawable.gl_begin(glcontext): return
-
-	x, y, width, height = glarea.get_allocation()
-
-	glViewport(0, 0, width, height)
-	glMatrixMode(GL_PROJECTION)
-	glLoadIdentity()
-	if width > height:
-		w = float(width) / float(height)
-		glFrustum(-w, w, -1.0, 1.0, 5.0, 60.0)
-	else:
-		h = float(height) / float(width)
-		glFrustum(-1.0, 1.0, -h, h, 5.0, 60.0)
-	glMatrixMode(GL_MODELVIEW)
-	glLoadIdentity()
-	glTranslatef(0.0, 0.0, -40.0)
-
-	gldrawable.gl_end()
-
-	return True
-
 def keypressevent(window, event):
-	global modifiers
-#	keyname = Gtk.gdk.keyval_name(event.keyval)
-	keyname=""
-	if keyname == "F1":
-		save_script(window)
-		message( "Script saved")
-	if keyname == "F5":
-		render(window)
-	if keyname == "F6":
-		export_stl(window)
-	if keyname == "Shift_L" or keyname == "Shift_R":
-		modifiers=1
+    print("keypress")
+#    global modifiers
+    keyval = event.keyval
+    print(keyval)
+
+    if keyval == Gdk.KEY_F1:
+        print("F1 presed")
+#        save_script(window)
+#        message( "Script saved")
+    if keyval == Gdk.KEY_F5:
+        print("F5 presed")
+#        render(window)
+    if keyval == Gdk.KEY_F6:
+        print("F6 presed")
+#        export_stl(window)
+    if keyval == 65505 or keyval == 65506: # TODO
+        print("Shift presed")
+#        modifiers=1
 
 def keyreleaseevent(window, event):
-	global modifiers
-#	keyname = Gtk.gdk.keyval_name(event.keyval)
-	keyname=""
-	if keyname == "Shift_L" or keyname == "Shift_R":
-		modifiers=0
+    pass
+#    global modifiers
+#   keyname = Gtk.gdk.keyval_name(event.keyval)
+#    keyname=""
+#    if keyname == "Shift_L" or keyname == "Shift_R":
+#        modifiers=0
 
-def pointermotion(glarea, event):
-	global button_pressed
-	global eventx
-	global eventy
-	global modifiers
-	if button_pressed == 0:
-		return
-	x, y, width, height = glarea.get_allocation()
-	event.y = height - event.y
-	dx = event.x - eventx
-	dy = event.y - eventy
-	if modifiers == 0:
-		if button_pressed == 1:
-			viewer.rotate_drag_do(event.x, event.y, dx, dy, button_pressed, modifiers)
-
-		if button_pressed == 3:
-			viewer.pan_drag_do(event.x, event.y, dx, dy, button_pressed, modifiers)
-
-	if modifiers == 1:
-		dy = int(dy)
-
-		if button_pressed == 1 or button_pressed == 2:
-			viewer.start_layer = viewer.start_layer + dy
-			if viewer.start_layer < 0:
-				viewer.start_layer = 0
-			if viewer.start_layer > viewer.end_layer:
-				viewer.start_layer = viewer.end_layer
-		if button_pressed == 3 or button_pressed == 2:
-			viewer.end_layer = viewer.end_layer + dy
-			if viewer.end_layer >= viewer.layer_num:
-				viewer.end_layer = viewer.layer_num-1
-			if viewer.end_layer < viewer.start_layer:
-				viewer.end_layer = viewer.start_layer
-
-def scrollevent(glarea, event):
-	if event.direction.value_name == "GDK_SCROLL_DOWN":
-		viewer.zoom = viewer.zoom / 1.5
-	if event.direction.value_name == "GDK_SCROLL_UP":
-		viewer.zoom = viewer.zoom * 1.5
-
-def idle(glarea):
-	# Invalidate whole window.
-	glarea.window.invalidate_rect(glarea.allocation, False)
-	# Update window synchronously (fast).
-	glarea.window.process_updates(False)
-	return True
-
-
-def map(glarea, event):
-	gobject.idle_add(idle, glarea)
-	return True
-
-button_pressed = 0
-eventx = 0
-eventy = 0
-modifiers = 0
-
-def buttonpress(glarea, event):
-	global button_pressed
-	global eventx
-	global eventy
-	global modifiers
-	x, y, width, height = glarea.get_allocation()
-	event.y = height - event.y
-	eventx = event.x
-	eventy = event.y
-	button_pressed = event.button
-
-	if modifiers == 0:
-		if event.button == 1:
-			viewer.rotate_drag_start(event.x, event.y, event.button, modifiers)
-
-		if event.button == 3:
-			viewer.pan_drag_start(event.x, event.y, event.button, modifiers)
-
-
-def buttonrelease(glarea, event):
-	global button_pressed
-	global eventx
-	global eventy
-	global modifiers
-	if event.button == 1:
-		viewer.rotate_drag_end(event.x, event.y, event.button, modifiers)
-
-	if event.button == 3:
-		viewer.pan_drag_end(event.x, event.y, event.button, modifiers)
-	button_pressed = 0
-
-
-
-def init(glarea):
-	# get GLContext and GLDrawable
-	glcontext = glarea.get_gl_context()
-	gldrawable = glarea.get_gl_drawable()
-
-	# GL calls
-	if not gldrawable.gl_begin(glcontext): return
-
-	glClearColor(0, 0, 0, 1)
-#	glColor3f(1, 0, 0)
-	glEnable(GL_DEPTH_TEST)
-	glEnable(GL_CULL_FACE)
-	glEnable(GL_NORMALIZE)
-
-	# Uncomment this line for a wireframe view
-	#lPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-
-	# Simple light setup.  On Windows GL_LIGHT0 is enabled by default,
-	# but this is not the case on Linux or Mac, so remember to always
-	# include it.
-	glEnable(GL_LIGHTING)
-	glEnable(GL_LIGHT0)
-	glEnable(GL_LIGHT1)
-	glEnable(GL_COLOR_MATERIAL)
-
-	# Define a simple function to create ctypes arrays of floats:
-	def vec(*args):
-		return (GLfloat * len(args))(*args)
-
-	glLightfv(GL_LIGHT0, GL_POSITION, vec(.5, .5, 1, 0))
-	glLightfv(GL_LIGHT0, GL_SPECULAR, vec(.5, .5, 1, 1))
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, vec(.5, .5, .5, 1))
-	glLightfv(GL_LIGHT1, GL_POSITION, vec(1, 0, .5, 0))
-	glLightfv(GL_LIGHT1, GL_DIFFUSE, vec(.5, .5, .5, 1))
-	glLightfv(GL_LIGHT1, GL_SPECULAR, vec(.5, .5, .5, 1))
-
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, vec(0.8, 0.8, 0.1, 1))
-	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, vec(0, 0, 0, 0))
-	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0.3)
-	glColorMaterial(GL_FRONT,GL_DIFFUSE)
-	glColorMaterial(GL_FRONT,GL_AMBIENT)
-#        glColorMaterial(GL_FRONT,GL_SPECULAR)
-
-	glEnable(GL_NORMALIZE)
-
-	gldrawable.gl_end()
-
-#	viewer.renderVertices()
 
 def message(str):
 	global win
@@ -534,6 +73,7 @@ def message(str):
 	    Gtk.BUTTONS_OK, str)
 	md.run()
 	md.destroy()
+
 ####################################
 # MyTextView
 ####################################
@@ -1581,27 +1121,6 @@ def export_stl(window):
 		message("File Exported")
 	dialog.destroy()
 
-#
-# GLX version
-#
-
-#major, minor = Gtk.gdkgl.query_version()
-
-#
-# frame buffer configuration
-#
-
-# use GLUT-style display mode bitmask
-#try:
-#	# try double-buffered
-#	glconfig = Gtk.gdkgl.Config(mode=(Gtk.gdkgl.MODE_RGB|
-#				  Gtk.gdkgl.MODE_DOUBLE |
-#				   Gtk.gdkgl.MODE_DEPTH))
-#except Gtk.gdkgl.NoMatches:
-#	# try single-buffered
-#	glconfig = Gtk.gdkgl.Config(mode=(Gtk.gdkgl.MODE_RGB	|
-#					  Gtk.gdkgl.MODE_DEPTH))
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("file", help="Graphics  File")
@@ -1617,18 +1136,6 @@ tv.set_size_request(300, 600)
 tvscroll = Gtk.ScrolledWindow()
 tvscroll.add(tv)
 
-#model = Model()
-
-#if args.file.endswith(".svg"):
-#	model.loadSvg(args.file,args.scale)
-#if args.file.endswith(".plt"):
-#	model.loadPlt(args.file,args.scale)
-#if args.file.endswith(".gcode"):
-#	model.loadGcode(args.file)
-#if args.file.endswith(".ngc"):
-#	model.loadNgc(args.file)
-#if args.file.endswith(".stl"):
-#	model.loadStl(args.file,1.0,1.0,1.0)
 if args.file.endswith(".py"):
 	textbuffer = tv.get_buffer()
 	infile = open(args.file, "r")
@@ -1641,9 +1148,44 @@ if args.file.endswith(".py"):
 # top-level Gtk.Window
 #
 
+# vertex position array
+vertices  = [
+     .5, .5, .5,  -.5, .5, .5,  -.5,-.5, .5,  .5,-.5, .5, # v0,v1,v2,v3 (ront)
+     .5, .5, .5,   .5,-.5, .5,   .5,-.5,-.5,  .5, .5,-.5, # v0,v3,v4,v5 (right)
+     .5, .5, .5,   .5, .5,-.5,  -.5, .5,-.5, -.5, .5, .5, # v0,v5,v6,v1 (top)
+    -.5, .5, .5,  -.5, .5,-.5,  -.5,-.5,-.5, -.5,-.5, .5, # v1,v6,v7,v2 (let)
+    -.5,-.5,-.5,   .5,-.5,-.5,   .5,-.5, .5, -.5,-.5, .5, # v7,v4,v3,v2 (bottom)
+     .5,-.5,-.5,  -.5,-.5,-.5,  -.5, .5,-.5,  .5, .5,-.5  # v4,v7,v6,v5 (back)
+    ]
 
-viewer = Viewer()
-#viewer.setModel(model)
+normals = [
+     0, 0, 1,   0, 0, 1,   0, 0, 1,   0, 0, 1,  # v0,v1,v2,v3 (front)
+     1, 0, 0,   1, 0, 0,   1, 0, 0,   1, 0, 0,  # v0,v3,v4,v5 (right)
+     0, 1, 0,   0, 1, 0,   0, 1, 0,   0, 1, 0,  # v0,v5,v6,v1 (top)
+    -1, 0, 0,  -1, 0, 0,  -1, 0, 0,  -1, 0, 0,  # v1,v6,v7,v2 (left)
+     0,-1, 0,   0,-1, 0,   0,-1, 0,   0,-1, 0,  # v7,v4,v3,v2 (bottom)
+     0, 0,-1,   0, 0,-1,   0, 0,-1,   0, 0,-1   # v4,v7,v6,v5 (back)
+        ]
+
+# colour array
+colors=[
+     1, 1, 1,   1, 1, 0,   1, 0, 0,   1, 0, 1,  # v0,v1,v2,v3 (front)
+     1, 1, 1,   1, 0, 1,   0, 0, 1,   0, 1, 1,  # v0,v3,v4,v5 (right)
+     1, 1, 1,   0, 1, 1,   0, 1, 0,   1, 1, 0,  # v0,v5,v6,v1 (top)
+     1, 1, 0,   0, 1, 0,   0, 0, 0,   1, 0, 0,  # v1,v6,v7,v2 (left)
+     0, 0, 0,   0, 0, 1,   1, 0, 1,   1, 0, 0,  # v7,v4,v3,v2 (bottom)
+     0, 0, 1,   0, 0, 0,   0, 1, 0,   0, 1, 1   # v4,v7,v6,v5 (back)
+        ]
+
+
+indices = [
+     0, 1, 2,   2, 3, 0,    # v0-v1-v2, v2-v3-v0 (front)
+     4, 5, 6,   6, 7, 4,    # v0-v3-v4, v4-v5-v0 (right)
+     8, 9,10,  10,11, 8,    # v0-v5-v6, v6-v1-v0 (top)
+    12,13,14,  14,15,12,    # v1-v6-v7, v7-v2-v1 (left)
+    16,17,18,  18,19,16,    # v7-v4-v3, v3-v2-v7 (bottom)
+    20,21,22,  22,23,20     # v4-v7-v6, v6-v5-v4 (back)
+        ]
 
 
 
@@ -1656,24 +1198,13 @@ win.set_reallocate_redraws(True)
 
 win.connect('destroy', Gtk.main_quit)
 
-
-#glarea = Gtk.Gtkgl.DrawingArea(glconfig)
-#glarea.set_size_request(500, 600)
-
-#glarea.connect_after('realize', init)
-#glarea.connect('configure_event', reshape)
-#glarea.connect('expose_event', draw)
-#glarea.connect('map_event', map)
-#glarea.connect('button-press-event',buttonpress)
-#glarea.connect('button-release-event',buttonrelease)
-#glarea.connect('motion-notify-event',pointermotion)
-#glarea.connect('scroll-event',scrollevent)
-#glarea.set_events(Gtk.gdk.BUTTON_PRESS_MASK | Gtk.gdk.BUTTON_RELEASE_MASK | Gtk.gdk.POINTER_MOTION_MASK)
-#glarea.show()
+viewer3d = My3DViewer()
+viewer3d.setModel(vertices,normals,colors,indices)
+viewer3d.set_size_request(500, 600)
 
 hbox = Gtk.HPaned()
 hbox.add(tvscroll)
-#hbox.add(glarea)
+hbox.add(viewer3d)
 
 filesave = Gtk.MenuItem("Save")
 filesave.connect("activate", save_script)
@@ -1704,7 +1235,7 @@ win.connect('key-press-event',keypressevent)
 win.connect('key-release-event',keyreleaseevent)
 
 win.show_all()
-
 Gtk.main()
+
 # vim: softtabstop=8 noexpandtab
 
