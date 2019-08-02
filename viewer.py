@@ -1130,10 +1130,9 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # https://gist.github.com/otsaloma/1912166
 tv = MyTextView()
-tv.set_size_request(300, 600)
 
-#tv.connect("draw", on_text_view_draw)
 tvscroll = Gtk.ScrolledWindow()
+tvscroll.set_min_content_width(300)
 tvscroll.add(tv)
 
 if args.file.endswith(".py"):
