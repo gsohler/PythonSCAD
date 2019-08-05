@@ -68,9 +68,7 @@ def keyreleaseevent(window, event):
 def message(str):
 	global win
 	parent = None
-	md = Gtk.MessageDialog(win,
-		Gtk.DIALOG_DESTROY_WITH_PARENT, Gtk.MESSAGE_INFO,
-	    Gtk.BUTTONS_OK, str)
+	md = Gtk.MessageDialog(None,0,Gtk.MessageType.INFO, Gtk.ButtonsType.OK, str)
 	md.run()
 	md.destroy()
 
@@ -1019,6 +1017,57 @@ def volume():
 # Top
 ####################################
 
+def renderVertices():
+	def renderVertices(self,result):
+		self.faces = []
+		self.normals = []
+		self.vertices = []
+		self.colors = []
+		self.vnormals = []
+		polygons=result.toPolygons()
+
+		for polygon in polygons:
+			n = polygon.plane.normal
+			indices = []
+			for v in polygon.vertices:
+				pos = [v.pos.x, v.pos.y, v.pos.z]
+				if not pos in self.vertices:
+					self.vertices.append(pos)
+					self.vnormals.append([])
+				index = self.vertices.index(pos)
+				indices.append(index)
+				self.vnormals[index].append(v.normal)
+			self.faces.append(indices)
+			self.normals.append([n.x, n.y, n.z])
+			self.colors.append(polygon.shared)
+
+		# setup vertex-normals
+		ns = []
+		for vns in self.vnormals:
+			n = Vector(0.0, 0.0, 0.0)
+			for vn in vns:
+				n = n.plus(vn)
+			n = n.dividedBy(len(vns))
+			ns.append([a for a in n])
+		self.vnormals = ns
+
+		global listind
+		if listind == -1:
+			listind = glGenLists(1)
+		glNewList(listind, GL_COMPILE)
+
+		for n, f in enumerate(self.faces):
+			glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
+
+			glBegin(GL_POLYGON)
+			glColor3f(0.8,0.8,0)
+			glNormal3fv(self.normals[n])
+			for i in f:
+				glVertex3fv(self.vertices[i])
+			glEnd()
+		glEndList()
+
+
 def render(window):
 	global meshstack
 #	model.items = []
@@ -1059,7 +1108,7 @@ def render(window):
 #		viewer.renderVertices()
 #		return
 
-	olygons=mesh.toPolygons()
+	polygons=mesh.toPolygons()
 	ptmin = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
 	ptmax = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
 	for poly in polygons:
@@ -1080,13 +1129,13 @@ def render(window):
 				ptmin[2] = pt.pos.z
 
 	print("Dimension [%g %g %g]\n"%(ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2]))
-	viewer.renderVertices(mesh)
+	renderVertices(mesh)
 
 
 
 def save_script(window):
 	buffer = tv.get_buffer()
-	script = buffer.get_text(buffer.get_start_iter(),buffer.get_end_iter())
+	script = buffer.get_text(buffer.get_start_iter(),buffer.get_end_iter(),True)
 	outfile = open(args.file, "w")
 	if outfile:
 		outfile.write(script)
@@ -1096,7 +1145,7 @@ def save_script(window):
 def export_stl(window):
 	if len(meshstack) == 0:
 		message( "Error: No Objects generated")
-		viewer.renderVertices()
+		viewer.renderVertices() # TODO fix
 		return
 	mesh = meshstack[0]
 	text_filter=Gtk.FileFilter()
@@ -1189,10 +1238,8 @@ indices = [
 
 
 win = Gtk.Window()
-win.set_title("Model Viewer")
+win.set_title("PythonSCAD")
 
-#if sys.platform != 'win32':
-#	win.set_resize_mode(Gtk.RESIZE_IMMEDIATE)
 win.set_reallocate_redraws(True)
 
 win.connect('destroy', Gtk.main_quit)

@@ -522,6 +522,50 @@ class My3DViewer(Gtk.GLArea):
         self.indices=indices
         pass
 
+    def renderVertices(self,result):
+        self.faces = []
+        self.normals = []
+        self.vertices = []
+        self.colors = []
+        self.vnormals = []
+        polygons=result.toPolygons()
+
+       	for polygon in polygons:
+            n = polygon.plane.normal
+            indices = []
+            for v in polygon.vertices:
+                pos = [v.pos.x, v.pos.y, v.pos.z]
+                if not pos in self.vertices:
+                    self.vertices.append(pos)
+                    self.vnormals.append([])
+                index = self.vertices.index(pos)
+                indices.append(index)
+                self.vnormals[index].append(v.normal)
+            self.faces.append(indices)
+            self.normals.append([n.x, n.y, n.z])        
+            self.colors.append(polygon.shared)
+
+        # setup vertex-normals
+        ns = []
+        for vns in self.vnormals:
+            n = Vector(0.0, 0.0, 0.0)
+            for vn in vns:
+                n = n.plus(vn)
+            n = n.dividedBy(len(vns))
+            ns.append([a for a in n])
+        self.vnormals = ns
+
+
+        for n, f in enumerate(self.faces):
+            glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
+
+            glBegin(GL_POLYGON)
+            glColor3f(0.8,0.8,0)
+            glNormal3fv(self.normals[n])
+            for i in f:
+                glVertex3fv(self.vertices[i])
+            glEnd()
+
 
     def test_features(self):
         print('Testing features')
