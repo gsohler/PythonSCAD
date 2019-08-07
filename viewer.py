@@ -21,7 +21,7 @@ import argparse
 import sys
 import signal
 import numpy as np
-
+import traceback
 import gi
 gi.require_version('Gtk','3.0')
 from gi.repository import Gtk
@@ -48,7 +48,7 @@ def keypressevent(window, event):
 #        message( "Script saved")
     if keyval == Gdk.KEY_F5:
         print("F5 presed")
-#        render(window)
+        render(window)
     if keyval == Gdk.KEY_F6:
         print("F6 presed")
 #        export_stl(window)
@@ -1017,57 +1017,6 @@ def volume():
 # Top
 ####################################
 
-def renderVertices():
-	def renderVertices(self,result):
-		self.faces = []
-		self.normals = []
-		self.vertices = []
-		self.colors = []
-		self.vnormals = []
-		polygons=result.toPolygons()
-
-		for polygon in polygons:
-			n = polygon.plane.normal
-			indices = []
-			for v in polygon.vertices:
-				pos = [v.pos.x, v.pos.y, v.pos.z]
-				if not pos in self.vertices:
-					self.vertices.append(pos)
-					self.vnormals.append([])
-				index = self.vertices.index(pos)
-				indices.append(index)
-				self.vnormals[index].append(v.normal)
-			self.faces.append(indices)
-			self.normals.append([n.x, n.y, n.z])
-			self.colors.append(polygon.shared)
-
-		# setup vertex-normals
-		ns = []
-		for vns in self.vnormals:
-			n = Vector(0.0, 0.0, 0.0)
-			for vn in vns:
-				n = n.plus(vn)
-			n = n.dividedBy(len(vns))
-			ns.append([a for a in n])
-		self.vnormals = ns
-
-		global listind
-		if listind == -1:
-			listind = glGenLists(1)
-		glNewList(listind, GL_COMPILE)
-
-		for n, f in enumerate(self.faces):
-			glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
-
-			glBegin(GL_POLYGON)
-			glColor3f(0.8,0.8,0)
-			glNormal3fv(self.normals[n])
-			for i in f:
-				glVertex3fv(self.vertices[i])
-			glEnd()
-		glEndList()
-
-
 def render(window):
 	global meshstack
 #	model.items = []
@@ -1075,7 +1024,7 @@ def render(window):
 
 	try:
 		buffer = tv.get_buffer()
-		script = buffer.get_text(buffer.get_start_iter(),buffer.get_end_iter())
+		script = buffer.get_text(buffer.get_start_iter(),buffer.get_end_iter(),True)
 		exec(script)
 	except Exception:
 		message("Error in Script")
@@ -1129,7 +1078,7 @@ def render(window):
 				ptmin[2] = pt.pos.z
 
 	print("Dimension [%g %g %g]\n"%(ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2]))
-	renderVertices(mesh)
+	viewer3d.renderVertices(mesh)
 
 
 

@@ -8,6 +8,7 @@ import glm
 
 # https://learnopengl.com/Getting-started/Shaders 
 # http://www.songho.ca/opengl/gl_vbo.html#example2
+# https://learnopengl.com/code_viewer.php?code=advanced/cubemaps-exercise1
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -17,27 +18,33 @@ from OpenGL.GL import *
 from OpenGL.GL import shaders
 import numpy as np
 
+from csg.geom import Vertex, Vector
+
+# Local Space
+# -> Model Matrix, wie ist das Ding gedreht im Raum
+# World Space
+# -> View Matrix, zur Camera hin drehen
+# View Space
+# -> Projection Matrix # Orthogonal oder Pespectivisch
+# Clip Space
+# Screen Space
+
 VERTEX_SHADER = """
     #version 330
     //uniforms
-    uniform mat4 matrixModelView;
-    uniform mat4 matrixNormal;
-    uniform mat4 matrixModelViewProjection;
+    uniform mat4 matrixModelModel; // Model Matrix
+    uniform mat4 matrixModelView; // View Matrix
+    uniform mat4 matrixModelProjection; //Projection Matrix
     // vertex attribs (input)
     attribute vec3 vertexPosition;
     attribute vec3 vertexNormal;
     attribute vec3 vertexColor;
-    attribute vec2 vertexTexCoord;
     // varyings (output)
-    varying vec3 esVertex, esNormal;
     varying vec3 color;
     void main()
     {
-        esVertex = vec3(matrixModelView * vec4(vertexPosition, 1.0));
-        esNormal = vec3(matrixNormal * vec4(vertexNormal, 1.0));
         color = vertexColor;
-//	color = vec3(1,0,1)* esNormal; // TODO
-        gl_Position = matrixModelViewProjection * vec4(vertexPosition, 1.0);
+        gl_Position = matrixModelModel * matrixModelView * matrixModelProjection * vec4(vertexPosition, 1.0);
     }"""
 
 FRAGMENT_SHADER = """
@@ -49,32 +56,34 @@ FRAGMENT_SHADER = """
     uniform vec4 lightSpecular;             // light specular color
 
     // varyings
-    varying vec3 esVertex, esNormal;
+//    varying vec3 esVertex, esNormal;
     varying vec3 color;
 
     void main()
     {
-        vec3 normal = normalize(esNormal);
-        vec3 light;
-        if(lightPosition.w == 0.0)
-        {
-            light = normalize(lightPosition.xyz);
-        }
-        else
-        {
-            light = normalize(lightPosition.xyz - esVertex);
-        }
-        vec3 view = normalize(-esVertex);
-        vec3 halfv = normalize(light + view);
+//        vec3 normal = normalize(esNormal);
+//        vec3 light;
+//        if(lightPosition.w == 0.0)
+//        {
+//            light = normalize(lightPosition.xyz);
+//        }
+//        else
+//        {
+//            light = normalize(lightPosition.xyz - esVertex);
+//        }
+//        vec3 view = normalize(-esVertex);
+//        vec3 halfv = normalize(light + view);
 
-        vec3 fragColor = lightAmbient.rgb * color;                  // begin with ambient
-        float dotNL = max(dot(normal, light), 0.0);
-       fragColor += lightDiffuse.rgb * color * dotNL;              // add diffuse
-       float dotNH = max(dot(normal, halfv), 0.0);
-       fragColor += pow(dotNH, 128.0) * lightSpecular.rgb * color; // add specular
+//        vec3 fragColor = lightAmbient.rgb * color;                  // begin with ambient
+//        float dotNL = max(dot(normal, light), 0.0);
+//       fragColor += lightDiffuse.rgb * color * dotNL;              // add diffuse
+//       float dotNH = max(dot(normal, halfv), 0.0);
+//       fragColor += pow(dotNH, 128.0) * lightSpecular.rgb * color; // add specular
         
        // set frag color
-        gl_FragColor = vec4(fragColor, 1.0);  // keep opaque=1
+       // gl_FragColor = vec4(fragColor, 1.0);  // keep opaque=1
+       gl_FragColor = vec4(color, 1.0);  // keep opaque=1
+
     }
     """
 
@@ -88,8 +97,6 @@ class My3DViewer(Gtk.GLArea):
 
     def updateModel(self,vertices,normals, colors, indices):
 
-        self.vboId = glGenBuffers(1) # TODO am falschen Platz ?
-        self.iboId = glGenBuffers(1)
 
         self.vsize = 4*len(vertices) #  falschen Platz
         self.nsize = 4*len(normals)
@@ -100,7 +107,6 @@ class My3DViewer(Gtk.GLArea):
         npcolors = np.array(colors, dtype=np.float32)
         npindices = np.array(indices, dtype=np.int32)
 
-        self.vertex_array_object = glGenVertexArrays(1)
         glBindVertexArray( self.vertex_array_object )
 
 
@@ -134,38 +140,27 @@ class My3DViewer(Gtk.GLArea):
 
         glUseProgram(self.shader)
 
-        mymat = glm.mat4(1.0)
-        mymat = glm.rotate(mymat,glm.radians(phi),glm.vec3(0,1,0))
-        mymat = glm.rotate(mymat,glm.radians(theta),glm.vec3(1,0,0))
-        mymat = glm.translate(mymat,glm.vec3(self.PX,self.PY,-self.zoom))
-
-        if new == True:
-            self.matrixView = mymat
-            self.matrixModel = glm.mat4(1.0)
-            self.matrixModelView = self.matrixView * self.matrixModel
-            self.matrixNormal = self.matrixModelView
-            glm.column(self.matrixNormal,3, glm.vec4(0,0,0,1))
-            self.matrixModelViewProjection = self.matrixProjection * self.matrixModelView
-
-        else:
-            self.matrixModelView = mymat
-            self.matrixNormal = self.matrixModelView
-            self.matrixModelViewProjection = glm.mat4(1.0)
-            self.matrixModelViewProjection = glm.rotate(self.matrixModelViewProjection,glm.radians(phi),glm.vec3(0,1,0))
-            self.matrixModelViewProjection = glm.rotate(self.matrixModelViewProjection,glm.radians(theta),glm.vec3(0,0,1))
+        matrixModelModel = glm.mat4(1.0) # Modell wird nicht gedreht
+        glUniformMatrix4fv(self.uniformMatrixModelModel,1,False,glm.value_ptr(matrixModelModel))
 
 
-        glUniformMatrix4fv(self.uniformMatrixModelView,1,False,glm.value_ptr(self.matrixModelView))
-        glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,False,glm.value_ptr(self.matrixModelViewProjection))
-        glUniformMatrix4fv(self.uniformMatrixNormal,1,False,glm.value_ptr(self.matrixNormal))
+        matrixModelView = glm.mat4(1.0) # Camera wird gedreht und entfernt
+        matrixModelView = glm.translate(matrixModelView,glm.vec3(self.PX,self.PY,-self.zoom))
+        matrixModelView = glm.rotate(matrixModelView,glm.radians(phi),glm.vec3(0,1,0))
+        matrixModelView = glm.rotate(matrixModelView,glm.radians(theta),glm.vec3(1,0,0))
+
+        glUniformMatrix4fv(self.uniformMatrixModelView,1,False,glm.value_ptr(matrixModelView))
+
+        matrixModelProjection = glm.mat4(1.0) # Keine Projektion
+        glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,False,glm.value_ptr(matrixModelProjection))
 
     def initGLSL(self):
         self.createShader()
         glUseProgram(self.shader)
 
         self.uniformMatrixModelView = glGetUniformLocation(self.shader, "matrixModelView")
-        self.uniformMatrixModelViewProjection = glGetUniformLocation(self.shader, "matrixModelViewProjection")
-        self.uniformMatrixNormal  = glGetUniformLocation(self.shader, "matrixNormal");
+        self.uniformMatrixModelViewProjection = glGetUniformLocation(self.shader, "matrixModelProjection")
+        self.uniformMatrixModelModel  = glGetUniformLocation(self.shader, "matrixModelModel");
         self.uniformLightPosition = glGetUniformLocation(self.shader, "lightPosition");
         self.uniformLightAmbient  = glGetUniformLocation(self.shader, "lightAmbient");
         self.uniformLightDiffuse  = glGetUniformLocation(self.shader, "lightDiffuse");
@@ -174,7 +169,6 @@ class My3DViewer(Gtk.GLArea):
         self.attribVertexPosition = glGetAttribLocation(self.shader, "vertexPosition")
         self.attribVertexNormal   = glGetAttribLocation(self.shader, "vertexNormal")
         self.attribVertexColor    = glGetAttribLocation(self.shader, "vertexColor")
-        self.attribVertexTexCoord = glGetAttribLocation(self.shader, "vertexTexCoord")
 
 
         # set uniform values
@@ -186,9 +180,6 @@ class My3DViewer(Gtk.GLArea):
         glUniform4fv(self.uniformLightAmbient, 1, lightAmbient);
         glUniform4fv(self.uniformLightDiffuse, 1, lightDiffuse);
         glUniform4fv(self.uniformLightSpecular, 1, lightSpecular);
-
-
-
 
     def on_configure_event(self, widget):
         print('realize event')
@@ -208,6 +199,10 @@ class My3DViewer(Gtk.GLArea):
         print('errors')
         print(widget.get_error())
 
+
+        self.vertex_array_object = glGenVertexArrays(1)
+        self.vboId = glGenBuffers(1) 
+        self.iboId = glGenBuffers(1)
 
         self.updateModel(self.vertices,self.normals, self.colors, self.indices)
 
@@ -235,16 +230,15 @@ class My3DViewer(Gtk.GLArea):
         glBindBuffer(GL_ARRAY_BUFFER, self.vboId)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.iboId)
 
-        glEnableVertexAttribArray(self.attribVertex)
-        glEnableVertexAttribArray(self.attribNormal)
-        glEnableVertexAttribArray(self.attribColor)
 
         glVertexAttribPointer(self.attribVertex, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0))
         glVertexAttribPointer(self.attribNormal, 3, GL_FLOAT, False, 0, ctypes.c_void_p(self.vsize))
         glVertexAttribPointer(self.attribColor, 3, GL_FLOAT, False, 0, ctypes.c_void_p(self.vsize+self.nsize))
 
+        glEnableVertexAttribArray(self.attribVertex)
+        glEnableVertexAttribArray(self.attribNormal)
+        glEnableVertexAttribArray(self.attribColor)
 
-# Set Color        
 
         glDrawElements(GL_TRIANGLES,len(self.indices),GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
 
@@ -259,8 +253,6 @@ class My3DViewer(Gtk.GLArea):
         glBindVertexArray( 0 )
 
         glFlush()
-
-        glBindVertexArray( 0)
         return True
 
     def rotate_drag_start(self, x, y, button, modifiers):
@@ -481,7 +473,6 @@ class My3DViewer(Gtk.GLArea):
 
     def __init__(self):
         Gtk.GLArea.__init__(self)
-#        self.canvas = Gtk.GLArea()
         self.set_required_version(3, 3)
         self.test_features()
 
@@ -496,11 +487,12 @@ class My3DViewer(Gtk.GLArea):
         self.modifiers = 0
 
         # Rotation and pan parameters
-        self.RX = -74.2
-        self.RZ = 29.2
-        self.PX = -0.68
-        self.PY = -1.38
-        self.zoom = 0.0058
+
+        self.PX=-0.56
+        self.PY=-0.14
+        self.RX=-54
+        self.RZ=-61
+        self.zoom=0.0011
 
         self.connect('realize', self.on_configure_event)
         self.connect('render', self.on_draw)
@@ -523,48 +515,44 @@ class My3DViewer(Gtk.GLArea):
         pass
 
     def renderVertices(self,result):
-        self.faces = []
-        self.normals = []
-        self.vertices = []
-        self.colors = []
-        self.vnormals = []
+        print("renderVertices called")
+        pts = [] 
+        self.indices = []
         polygons=result.toPolygons()
 
        	for polygon in polygons:
             n = polygon.plane.normal
             indices = []
             for v in polygon.vertices:
-                pos = [v.pos.x, v.pos.y, v.pos.z]
-                if not pos in self.vertices:
-                    self.vertices.append(pos)
-                    self.vnormals.append([])
-                index = self.vertices.index(pos)
+                pt = [v.pos.x, v.pos.y, v.pos.z, v.normal.x, v.normal.y, v.normal.z, 0.8, 0.8, 0.8 ]
+                if not pt in pts:
+                    pts.append(pt)
+                index = pts.index(pt)
                 indices.append(index)
-                self.vnormals[index].append(v.normal)
-            self.faces.append(indices)
-            self.normals.append([n.x, n.y, n.z])        
-            self.colors.append(polygon.shared)
+            for i in range(len(indices)-2): # TODO delaunay here
+                self.indices.append(indices[0])
+                self.indices.append(indices[i+1])
+                self.indices.append(indices[i+2])
 
-        # setup vertex-normals
-        ns = []
-        for vns in self.vnormals:
-            n = Vector(0.0, 0.0, 0.0)
-            for vn in vns:
-                n = n.plus(vn)
-            n = n.dividedBy(len(vns))
-            ns.append([a for a in n])
-        self.vnormals = ns
+        self.vertices = []
+        self.normals = []
+        self.colors = []
+        for pt in pts:
+            self.vertices.append(pt[0])
+            self.vertices.append(pt[1])
+            self.vertices.append(pt[2])
+            self.normals.append(pt[3]) # TODO dies ist 0
+            self.normals.append(pt[4])
+            self.normals.append(pt[5])
+            self.colors.append(pt[6])
+            self.colors.append(pt[7])
+            self.colors.append(pt[8])
 
-
-        for n, f in enumerate(self.faces):
-            glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
-
-            glBegin(GL_POLYGON)
-            glColor3f(0.8,0.8,0)
-            glNormal3fv(self.normals[n])
-            for i in f:
-                glVertex3fv(self.vertices[i])
-            glEnd()
+        print(self.vertices)
+        print(self.normals)
+        print(self.colors)
+        print(self.indices)
+        self.updateModel(self.vertices,self.normals, self.colors, self.indices)
 
 
     def test_features(self):
