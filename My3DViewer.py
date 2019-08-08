@@ -102,29 +102,50 @@ class My3DViewer(Gtk.GLArea):
         self.nsize = 4*len(normals)
         self.csize = 4*len(colors)
 
+        obj = np.arange(3*len(vertices),dtype=np.float32)
+        for i in range(int(len(vertices)/3)):
+            obj[i*9+0] = vertices[i*3+0]
+            obj[i*9+1] = vertices[i*3+1]
+            obj[i*9+2] = vertices[i*3+2]
+
+            obj[i*9+3] = normals[i*3+0]
+            obj[i*9+4] = normals[i*3+1]
+            obj[i*9+5] = normals[i*3+2]
+
+            obj[i*9+6] = colors[i*3+0]
+            obj[i*9+7] = colors[i*3+1]
+            obj[i*9+8] = colors[i*3+2]
+
         npvertices = np.array(vertices, dtype=np.float32)
         npnormals = np.array(normals, dtype=np.float32)
         npcolors = np.array(colors, dtype=np.float32)
         npindices = np.array(indices, dtype=np.int32)
 
-        glBindBuffer(GL_ARRAY_BUFFER, self.vboId)
-        glBufferData(GL_ARRAY_BUFFER, self.vsize+self.nsize+self.csize, None, GL_STATIC_DRAW)
-        glBufferSubData(GL_ARRAY_BUFFER, 0, self.vsize, npvertices)
-        glBufferSubData(GL_ARRAY_BUFFER, self.vsize, self.nsize, npnormals)
-        glBufferSubData(GL_ARRAY_BUFFER, self.vsize+self.nsize, self.csize, npnormals)
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.iboId)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, len(npindices)*4, npindices, GL_STATIC_DRAW)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-
-        # Describe the position data layout in the buffer
+ #       glBufferData(GL_ARRAY_BUFFER, self.vsize+self.nsize+self.csize, None, GL_STATIC_DRAW)
+#
+#        glEnableVertexAttribArray(self.attribVertex)
+#        glEnableVertexAttribArray(self.attribNormal)
+#        glEnableVertexAttribArray(self.attribColor)
+#
+#        glBufferSubData(GL_ARRAY_BUFFER, 0, self.vsize, npvertices)
+#        glBufferSubData(GL_ARRAY_BUFFER, self.vsize, self.nsize, npnormals)
+#        glBufferSubData(GL_ARRAY_BUFFER, self.vsize+self.nsize, self.csize, npcolors)
+#
 
 
+        glEnableVertexAttribArray(self.attribVertex)
+        glVertexAttribPointer(self.attribVertex, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*0))
 
-        # Unbind the VAO first (Important)
+        glEnableVertexAttribArray(self.attribNormal)
+        glVertexAttribPointer(self.attribNormal, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*3))
 
-        # Unbind other stuff
+        glEnableVertexAttribArray(self.attribColor)
+        glVertexAttribPointer(self.attribColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
+
+        glBufferData(GL_ARRAY_BUFFER,4*9*12,obj,GL_STATIC_DRAW)
+
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(npindices)*4, npindices, GL_STATIC_DRAW)
+
 
     def updateTransform(self,phi,theta):
 
@@ -133,21 +154,14 @@ class My3DViewer(Gtk.GLArea):
         glUseProgram(self.shader)
 
         matrixModelModel = glm.mat4(1.0) # Modell wird nicht gedreht
-
-#        matrixModelModel = glm.translate(matrixModelModel,glm.vec3(self.PX,self.PY,-self.zoom))
-        matrixModelModel = glm.rotate(matrixModelModel,glm.radians(phi),glm.vec3(0,1,0))
-        matrixModelModel = glm.rotate(matrixModelModel,glm.radians(theta),glm.vec3(1,0,0))
         glUniformMatrix4fv(self.uniformMatrixModelModel,1,GL_FALSE,glm.value_ptr(matrixModelModel))
 
-        camerapos=glm.vec3(0,0,-3)
-        matrixModelView = glm.lookAt(camerapos,glm.vec3(0,0,0),glm.vec3(0,1,0))
+        matrixModelView = glm.mat4(1.0)
+        matrixModelView = glm.translate(matrixModelView,glm.vec3(self.PX,self.PY,-self.zoom))
+        matrixModelView = glm.rotate(matrixModelView,glm.radians(phi),glm.vec3(0,1,0))
+        matrixModelView = glm.rotate(matrixModelView,glm.radians(theta),glm.vec3(1,0,0))
         glUniformMatrix4fv(self.uniformMatrixModelView,1,GL_FALSE,glm.value_ptr(matrixModelView))
 
-#        matrixModelProjection = glm.mat4(1.0) # Keine Projektion
-#
-#        Front = glm.vec3(0.0,0.0,-1.0)
-#        Up = glm.vec3(0.0,-1.0,0.0)
-#        self.camerapos=glm.vec3(0.0,-3.0,0)
         matrixModelProjection=glm.perspective(glm.radians(45),800.0/600.0, 0.1, 100.0)
         glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,GL_FALSE,glm.value_ptr(matrixModelProjection))
 
@@ -197,17 +211,20 @@ class My3DViewer(Gtk.GLArea):
         print(widget.get_error())
 
 
-        self.vertex_array_object = glGenVertexArrays(1)
-        self.vboId = glGenBuffers(1) 
-        self.iboId = glGenBuffers(1)
+        # Generate empty buffer
+        self.vbo = glGenBuffers(1) 
+        self.ibo = glGenBuffers(1)
 
-        glBindVertexArray( self.vertex_array_object )
+        # Generate empty vertex Array Object
+        self.vao = glGenVertexArrays(1)
+
+        # Set as current vertex array
+        glBindVertexArray( self.vao )
+
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
         self.updateModel(self.vertices,self.normals, self.colors, self.indices)
-
-        self.toPerspective()
-#        self.toOrtho()
-
 
         return True
 
@@ -223,16 +240,13 @@ class My3DViewer(Gtk.GLArea):
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        glBindVertexArray( self.vertex_array_object )
+        glBindVertexArray( self.vao )
 
         glUseProgram(self.shader)
-        glBindBuffer(GL_ARRAY_BUFFER, self.vboId)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.iboId)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
 
-        glVertexAttribPointer(self.attribVertex, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0))
-        glVertexAttribPointer(self.attribNormal, 3, GL_FLOAT, False, 0, ctypes.c_void_p(self.vsize))
-        glVertexAttribPointer(self.attribColor, 3, GL_FLOAT, False, 0, ctypes.c_void_p(self.vsize+self.nsize))
 
         glEnableVertexAttribArray(self.attribVertex)
         glEnableVertexAttribArray(self.attribNormal)
@@ -356,9 +370,9 @@ class My3DViewer(Gtk.GLArea):
     def scrollevent(self, widget, event):
         print("scrollevent")
         if event.direction.value_name == "GDK_SCROLL_DOWN":
-                self.zoom = self.zoom / 1.5
-        if event.direction.value_name == "GDK_SCROLL_UP":
                 self.zoom = self.zoom * 1.5
+        if event.direction.value_name == "GDK_SCROLL_UP":
+                self.zoom = self.zoom / 1.5
         print(self.PX, self.PY,self.RX,self.RZ, self.zoom)
         self.updateTransform(self.RX,self.RZ)
         self.queue_draw()
@@ -482,11 +496,11 @@ class My3DViewer(Gtk.GLArea):
 
         # Rotation and pan parameters
 
-        self.PX=1.32
-        self.PY=2.74
+        self.PX=0
+        self.PY=0
         self.RX=-34.6
         self.RZ=-199.2
-        self.zoom=0.00021
+        self.zoom=5.0
         self.camera=glm.vec3(0.0,0.0,3.0)
 
         self.connect('realize', self.on_configure_event)
