@@ -44,7 +44,7 @@ VERTEX_SHADER = """
     void main()
     {
         color = vertexColor;
-        gl_Position = matrixModelModel * matrixModelView * matrixModelProjection * vec4(vertexPosition, 1.0);
+        gl_Position = matrixModelProjection * matrixModelView * matrixModelModel * vec4(vertexPosition, 1.0);
     }"""
 
 FRAGMENT_SHADER = """
@@ -107,11 +107,6 @@ class My3DViewer(Gtk.GLArea):
         npcolors = np.array(colors, dtype=np.float32)
         npindices = np.array(indices, dtype=np.int32)
 
-        glBindVertexArray( self.vertex_array_object )
-
-
-
-
         glBindBuffer(GL_ARRAY_BUFFER, self.vboId)
         glBufferData(GL_ARRAY_BUFFER, self.vsize+self.nsize+self.csize, None, GL_STATIC_DRAW)
         glBufferSubData(GL_ARRAY_BUFFER, 0, self.vsize, npvertices)
@@ -126,13 +121,10 @@ class My3DViewer(Gtk.GLArea):
         # Describe the position data layout in the buffer
 
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
 
         # Unbind the VAO first (Important)
-        glBindVertexArray( 0 )
 
         # Unbind other stuff
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
     def updateTransform(self,phi,theta):
 
@@ -141,18 +133,23 @@ class My3DViewer(Gtk.GLArea):
         glUseProgram(self.shader)
 
         matrixModelModel = glm.mat4(1.0) # Modell wird nicht gedreht
-        glUniformMatrix4fv(self.uniformMatrixModelModel,1,False,glm.value_ptr(matrixModelModel))
 
+#        matrixModelModel = glm.translate(matrixModelModel,glm.vec3(self.PX,self.PY,-self.zoom))
+        matrixModelModel = glm.rotate(matrixModelModel,glm.radians(phi),glm.vec3(0,1,0))
+        matrixModelModel = glm.rotate(matrixModelModel,glm.radians(theta),glm.vec3(1,0,0))
+        glUniformMatrix4fv(self.uniformMatrixModelModel,1,GL_FALSE,glm.value_ptr(matrixModelModel))
 
-        matrixModelView = glm.mat4(1.0) # Camera wird gedreht und entfernt
-        matrixModelView = glm.translate(matrixModelView,glm.vec3(self.PX,self.PY,-self.zoom))
-        matrixModelView = glm.rotate(matrixModelView,glm.radians(phi),glm.vec3(0,1,0))
-        matrixModelView = glm.rotate(matrixModelView,glm.radians(theta),glm.vec3(1,0,0))
+        camerapos=glm.vec3(0,0,-3)
+        matrixModelView = glm.lookAt(camerapos,glm.vec3(0,0,0),glm.vec3(0,1,0))
+        glUniformMatrix4fv(self.uniformMatrixModelView,1,GL_FALSE,glm.value_ptr(matrixModelView))
 
-        glUniformMatrix4fv(self.uniformMatrixModelView,1,False,glm.value_ptr(matrixModelView))
-
-        matrixModelProjection = glm.mat4(1.0) # Keine Projektion
-        glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,False,glm.value_ptr(matrixModelProjection))
+#        matrixModelProjection = glm.mat4(1.0) # Keine Projektion
+#
+#        Front = glm.vec3(0.0,0.0,-1.0)
+#        Up = glm.vec3(0.0,-1.0,0.0)
+#        self.camerapos=glm.vec3(0.0,-3.0,0)
+        matrixModelProjection=glm.perspective(glm.radians(45),800.0/600.0, 0.1, 100.0)
+        glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,GL_FALSE,glm.value_ptr(matrixModelProjection))
 
     def initGLSL(self):
         self.createShader()
@@ -204,6 +201,8 @@ class My3DViewer(Gtk.GLArea):
         self.vboId = glGenBuffers(1) 
         self.iboId = glGenBuffers(1)
 
+        glBindVertexArray( self.vertex_array_object )
+
         self.updateModel(self.vertices,self.normals, self.colors, self.indices)
 
         self.toPerspective()
@@ -242,15 +241,10 @@ class My3DViewer(Gtk.GLArea):
 
         glDrawElements(GL_TRIANGLES,len(self.indices),GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
 
-        glDisableVertexAttribArray(self.attribVertex)
-        glDisableVertexAttribArray(self.attribNormal)
-        glDisableVertexAttribArray(self.attribColor)
-
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-        glUseProgram(0)
 
-        glBindVertexArray( 0 )
+
 
         glFlush()
         return True
@@ -488,11 +482,12 @@ class My3DViewer(Gtk.GLArea):
 
         # Rotation and pan parameters
 
-        self.PX=-0.56
-        self.PY=-0.14
-        self.RX=-54
-        self.RZ=-61
-        self.zoom=0.0011
+        self.PX=1.32
+        self.PY=2.74
+        self.RX=-34.6
+        self.RZ=-199.2
+        self.zoom=0.00021
+        self.camera=glm.vec3(0.0,0.0,3.0)
 
         self.connect('realize', self.on_configure_event)
         self.connect('render', self.on_draw)
@@ -503,9 +498,8 @@ class My3DViewer(Gtk.GLArea):
         self.set_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.SCROLL_MASK)
 
 
-        self.set_double_buffered(False)
+        self.set_double_buffered(GL_FALSE)
         self.set_size_request(500, 500)
-#        self.initGL()
 
     def setModel(self,vertices,normals,colors,indices): # TODO besser
         self.vertices=vertices
