@@ -37,10 +37,10 @@ listind = -1
 ####################################
 
 def keypressevent(window, event):
-    print("keypress")
+#    print("keypress")
 #    global modifiers
     keyval = event.keyval
-    print(keyval)
+#    print(keyval)
 
     if keyval == Gdk.KEY_F1:
         print("F1 presed")

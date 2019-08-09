@@ -47,7 +47,7 @@ VERTEX_SHADER = """
         vec4 wnormal  =  matrixModelView * matrixModelModel * vec4(vertexNormal, 0.0);
         vec4 sight = vec4(0, 0, 1.0, 0.0);
         float fdot = dot(sight, wnormal);
-        color = vertexColor * fdot;
+        color = vertexColor * (fdot*0.6+0.4);
     }"""
 
 FRAGMENT_SHADER = """
@@ -106,19 +106,18 @@ class My3DViewer(Gtk.GLArea):
             obj[i*9+1] = vertices[i*3+1]
             obj[i*9+2] = vertices[i*3+2]
 
-            obj[i*9+3] = normals[i*3+0] # TODO warum ist das verdreht ?
+            obj[i*9+3] = normals[i*3+0] 
             obj[i*9+4] = normals[i*3+1]
             obj[i*9+5] = normals[i*3+2]
 
-            obj[i*9+6] = colors[i*3+0]
-            obj[i*9+7] = colors[i*3+1]
-            obj[i*9+8] = colors[i*3+2]
+            obj[i*9+6] = 0.8# colors[i*3+0]
+            obj[i*9+7] = 0.8# colors[i*3+1]
+            obj[i*9+8] = 0.1#colors[i*3+2]
 
-        npvertices = np.array(vertices, dtype=np.float32)
-        npnormals = np.array(normals, dtype=np.float32)
-        npcolors = np.array(colors, dtype=np.float32)
         npindices = np.array(indices, dtype=np.int32)
 
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
         glEnableVertexAttribArray(self.attribVertex)
         glVertexAttribPointer(self.attribVertex, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*0))
@@ -129,10 +128,13 @@ class My3DViewer(Gtk.GLArea):
         glEnableVertexAttribArray(self.attribColor)
         glVertexAttribPointer(self.attribColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
 
-        glBufferData(GL_ARRAY_BUFFER,4*3*len(vertices),obj,GL_STATIC_DRAW)
+        glBufferData(GL_ARRAY_BUFFER,4*3*len(vertices),obj,GL_DYNAMIC_DRAW)
 
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(indices), npindices, GL_STATIC_DRAW) # bytes*2*tri*faces
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(indices), npindices, GL_DYNAMIC_DRAW) 
 
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
     def updateTransform(self,phi,theta):
 
@@ -149,7 +151,7 @@ class My3DViewer(Gtk.GLArea):
         matrixModelView = glm.rotate(matrixModelView,glm.radians(theta),glm.vec3(0,1,0))
         glUniformMatrix4fv(self.uniformMatrixModelView,1,GL_FALSE,glm.value_ptr(matrixModelView))
 
-        matrixModelProjection=glm.perspective(glm.radians(45),800.0/600.0, 0.1, 100.0)
+        matrixModelProjection=glm.perspective(glm.radians(45),self.screen.width/self.screen.height, 0.1, 100.0) 
         glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,GL_FALSE,glm.value_ptr(matrixModelProjection))
 
     def initGLSL(self):
@@ -209,18 +211,21 @@ class My3DViewer(Gtk.GLArea):
         # Set as current vertex array
         glBindVertexArray( self.vao )
 
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
         self.updateModel(self.vertices,self.normals, self.colors, self.indices)
+
+        self.queue_draw()
 
         return True
 
 
     def on_draw(self, widget, *args):
 #        print('render event')
+        self.screen=widget.get_allocation()
 
-        self.updateTransform(self.RX,self.RZ)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
+
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClearDepth(1.0)
@@ -228,12 +233,26 @@ class My3DViewer(Gtk.GLArea):
         glBindVertexArray( self.vao )
 
         glUseProgram(self.shader)
-#        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
-#        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
 
         glDrawElements(GL_TRIANGLES,len(self.indices),GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
 
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+
+#        glColor3f(1.0,0.0,0.0); # red x
+        glBegin(GL_LINES);
+        # x aix
+        
+        glVertex3f(-4.0, 0.0, 0.0);
+        glVertex3f(4.0, 0.0, 0.0);
+        
+        # arrow
+        glVertex3f(4.0, 0.0, 0.0);
+        glVertex3f(3.0, 1.0, 0.0);
+        
+        glVertex3f(4.0, 0.0, 0.0);
+        glVertex3f(3.0, -1.0, 0.0);
 
         glFlush()
         return True
@@ -278,6 +297,7 @@ class My3DViewer(Gtk.GLArea):
         # rotate!
         self.PX = self.panDragStartPX + deltaX*0.02
         self.PY = self.panDragStartPY + deltaY*0.02
+        self.updateTransform(self.RX,self.RZ) 
         self.queue_draw()
 
 
@@ -289,9 +309,7 @@ class My3DViewer(Gtk.GLArea):
 
 
     def buttonpress(self,widget, event):
-        x= widget.get_allocation()
-        rect = widget.get_allocation()
-        event.y = rect.height - event.y
+        event.y = self.screen.height - event.y
         self.eventx = event.x
         self.eventy = event.y
         self.button_pressed = event.button
@@ -314,8 +332,7 @@ class My3DViewer(Gtk.GLArea):
     def pointermotion(self, widget, event):
         if self.button_pressed == 0:
                 return
-        rect = widget.get_allocation()
-        event.y = rect.height - event.y
+        event.y = self.screen.height - event.y
         dx = event.x - self.eventx
         dy = event.y - self.eventy
         if self.modifiers == 0:
@@ -343,12 +360,10 @@ class My3DViewer(Gtk.GLArea):
         return True
     
     def scrollevent(self, widget, event):
-        print("scrollevent")
         if event.direction.value_name == "GDK_SCROLL_DOWN":
                 self.zoom = self.zoom * 1.5
         if event.direction.value_name == "GDK_SCROLL_UP":
                 self.zoom = self.zoom / 1.5
-        print(self.PX, self.PY,self.RX,self.RZ, self.zoom)
         self.updateTransform(self.RX,self.RZ)
         self.queue_draw()
     
@@ -407,10 +422,9 @@ class My3DViewer(Gtk.GLArea):
 
         self.PX=0
         self.PY=0
-        self.RX=-34.6
-        self.RZ=-199.2
+        self.RX=0
+        self.RZ=0
         self.zoom=5.0
-        self.camera=glm.vec3(0.0,0.0,3.0)
 
         self.connect('realize', self.on_configure_event)
         self.connect('render', self.on_draw)
@@ -433,7 +447,6 @@ class My3DViewer(Gtk.GLArea):
         pass
 
     def renderVertices(self,result):
-        print("renderVertices called")
         pts = [] 
         self.indices = []
         polygons=result.toPolygons()
@@ -442,7 +455,7 @@ class My3DViewer(Gtk.GLArea):
             n = polygon.plane.normal
             indices = []
             for v in polygon.vertices:
-                pt = [v.pos.x, v.pos.y, v.pos.z, v.normal.x, v.normal.y, v.normal.z, 0.8, 0.8, 0.8 ]
+                pt = [v.pos.x, v.pos.y, v.pos.z, n.x, n.y, n.z, 0.8, 0.8, 0.1 ]
                 if not pt in pts:
                     pts.append(pt)
                 index = pts.index(pt)
@@ -459,18 +472,15 @@ class My3DViewer(Gtk.GLArea):
             self.vertices.append(pt[0])
             self.vertices.append(pt[1])
             self.vertices.append(pt[2])
-            self.normals.append(pt[3]) # TODO dies ist 0
+            self.normals.append(pt[3])
             self.normals.append(pt[4])
             self.normals.append(pt[5])
             self.colors.append(pt[6])
             self.colors.append(pt[7])
             self.colors.append(pt[8])
 
-        print(self.vertices)
-        print(self.normals)
-        print(self.colors)
-        print(self.indices)
         self.updateModel(self.vertices,self.normals, self.colors, self.indices)
+        self.queue_draw()
 
 
     def test_features(self):
