@@ -43,8 +43,11 @@ VERTEX_SHADER = """
     varying vec3 color;
     void main()
     {
-        color = vertexColor;
         gl_Position = matrixModelProjection * matrixModelView * matrixModelModel * vec4(vertexPosition, 1.0);
+        vec4 wnormal  =  matrixModelView * matrixModelModel * vec4(vertexNormal, 0.0);
+        vec4 sight = vec4(0, 0, 1.0, 0.0);
+        float fdot = dot(sight, wnormal);
+        color = vertexColor * fdot;
     }"""
 
 FRAGMENT_SHADER = """
@@ -103,13 +106,13 @@ class My3DViewer(Gtk.GLArea):
             obj[i*9+1] = vertices[i*3+1]
             obj[i*9+2] = vertices[i*3+2]
 
-            obj[i*9+6] = normals[i*3+0] # TODO warum ist das verdreht ?
-            obj[i*9+7] = normals[i*3+1]
-            obj[i*9+8] = normals[i*3+2]
+            obj[i*9+3] = normals[i*3+0] # TODO warum ist das verdreht ?
+            obj[i*9+4] = normals[i*3+1]
+            obj[i*9+5] = normals[i*3+2]
 
-            obj[i*9+3] = colors[i*3+0]
-            obj[i*9+4] = colors[i*3+1]
-            obj[i*9+5] = colors[i*3+2]
+            obj[i*9+6] = colors[i*3+0]
+            obj[i*9+7] = colors[i*3+1]
+            obj[i*9+8] = colors[i*3+2]
 
         npvertices = np.array(vertices, dtype=np.float32)
         npnormals = np.array(normals, dtype=np.float32)
