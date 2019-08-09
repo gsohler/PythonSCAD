@@ -97,40 +97,24 @@ class My3DViewer(Gtk.GLArea):
 
     def updateModel(self,vertices,normals, colors, indices):
 
-
-        self.vsize = 4*len(vertices) #  falschen Platz
-        self.nsize = 4*len(normals)
-        self.csize = 4*len(colors)
-
         obj = np.arange(3*len(vertices),dtype=np.float32)
         for i in range(int(len(vertices)/3)):
             obj[i*9+0] = vertices[i*3+0]
             obj[i*9+1] = vertices[i*3+1]
             obj[i*9+2] = vertices[i*3+2]
 
-            obj[i*9+3] = normals[i*3+0]
-            obj[i*9+4] = normals[i*3+1]
-            obj[i*9+5] = normals[i*3+2]
+            obj[i*9+6] = normals[i*3+0] # TODO warum ist das verdreht ?
+            obj[i*9+7] = normals[i*3+1]
+            obj[i*9+8] = normals[i*3+2]
 
-            obj[i*9+6] = colors[i*3+0]
-            obj[i*9+7] = colors[i*3+1]
-            obj[i*9+8] = colors[i*3+2]
+            obj[i*9+3] = colors[i*3+0]
+            obj[i*9+4] = colors[i*3+1]
+            obj[i*9+5] = colors[i*3+2]
 
         npvertices = np.array(vertices, dtype=np.float32)
         npnormals = np.array(normals, dtype=np.float32)
         npcolors = np.array(colors, dtype=np.float32)
         npindices = np.array(indices, dtype=np.int32)
-
- #       glBufferData(GL_ARRAY_BUFFER, self.vsize+self.nsize+self.csize, None, GL_STATIC_DRAW)
-#
-#        glEnableVertexAttribArray(self.attribVertex)
-#        glEnableVertexAttribArray(self.attribNormal)
-#        glEnableVertexAttribArray(self.attribColor)
-#
-#        glBufferSubData(GL_ARRAY_BUFFER, 0, self.vsize, npvertices)
-#        glBufferSubData(GL_ARRAY_BUFFER, self.vsize, self.nsize, npnormals)
-#        glBufferSubData(GL_ARRAY_BUFFER, self.vsize+self.nsize, self.csize, npcolors)
-#
 
 
         glEnableVertexAttribArray(self.attribVertex)
@@ -142,9 +126,9 @@ class My3DViewer(Gtk.GLArea):
         glEnableVertexAttribArray(self.attribColor)
         glVertexAttribPointer(self.attribColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
 
-        glBufferData(GL_ARRAY_BUFFER,4*9*12,obj,GL_STATIC_DRAW)
+        glBufferData(GL_ARRAY_BUFFER,4*3*len(vertices),obj,GL_STATIC_DRAW)
 
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(npindices)*4, npindices, GL_STATIC_DRAW)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(indices), npindices, GL_STATIC_DRAW) # bytes*2*tri*faces
 
 
     def updateTransform(self,phi,theta):
@@ -158,8 +142,8 @@ class My3DViewer(Gtk.GLArea):
 
         matrixModelView = glm.mat4(1.0)
         matrixModelView = glm.translate(matrixModelView,glm.vec3(self.PX,self.PY,-self.zoom))
-        matrixModelView = glm.rotate(matrixModelView,glm.radians(phi),glm.vec3(0,1,0))
-        matrixModelView = glm.rotate(matrixModelView,glm.radians(theta),glm.vec3(1,0,0))
+        matrixModelView = glm.rotate(matrixModelView,-glm.radians(phi),glm.vec3(1,0,0))
+        matrixModelView = glm.rotate(matrixModelView,glm.radians(theta),glm.vec3(0,1,0))
         glUniformMatrix4fv(self.uniformMatrixModelView,1,GL_FALSE,glm.value_ptr(matrixModelView))
 
         matrixModelProjection=glm.perspective(glm.radians(45),800.0/600.0, 0.1, 100.0)
@@ -203,6 +187,7 @@ class My3DViewer(Gtk.GLArea):
         print(widget.get_error())
 
 
+        self.initGL()
         self.initGLSL()
 
 
@@ -231,33 +216,20 @@ class My3DViewer(Gtk.GLArea):
 
     def on_draw(self, widget, *args):
 #        print('render event')
-#        print(widget.get_error())
-        #Create the VBO
-
-        widget.attach_buffers()
 
         self.updateTransform(self.RX,self.RZ)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glClearDepth(1.0)
 
         glBindVertexArray( self.vao )
 
         glUseProgram(self.shader)
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
-
-
-
-        glEnableVertexAttribArray(self.attribVertex)
-        glEnableVertexAttribArray(self.attribNormal)
-        glEnableVertexAttribArray(self.attribColor)
+#        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+#        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
 
         glDrawElements(GL_TRIANGLES,len(self.indices),GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-
 
 
         glFlush()
@@ -399,85 +371,19 @@ class My3DViewer(Gtk.GLArea):
         glLoadIdentity()
         gluLookAt(posX, posY, posZ, targetX, targetY, targetZ, 0, 1, 0); # eye(x,y,z), focal(x,y,z), up(x,y,z)
 
-    def toOrtho(self):
-
-        win= self.get_allocation()
-        N = -1.0
-        F = 1.0
-
-        # set viewport to be the entire window
-        glViewport(0, 0, win.width, win.height)
-
-        # construct ortho projection matrix
-        self.matrixProjection = glm.mat4(1.0)
-        self.matrixProjection[0][0]  =  2 / win.width
-        self.matrixProjection[1][1]  =  2 / win.height
-        self.matrixProjection[2][2] = -2 / (F - N)
-        self.matrixProjection[3][2] = -(F + N) / (F - N) # TODO dies richtig rum ?
-
-        # set orthographic viewing frustum
-#        glMatrixMode(GL_PROJECTION)
-#        glLoadMatrixf(glm.value_ptr(self.matrixProjection))
-        #glLoadIdentity()
-        #glOrtho(0, win.width, 0, win.height, -1, 1)
-
-        # switch to modelview matrix in order to set scene
-#        glMatrixMode(GL_MODELVIEW) TODO activate
-#        glLoadIdentity() TODO activate
-
-    def toPerspective(self): 
-        print("to perspective")
-        win= self.get_allocation()
-        N = 0.1
-        F = 100.0
-        DEG2RAD = 3.141592 / 180
-        FOV_Y = 60.0 * DEG2RAD
-
-        # set viewport to be the entire window
-        glViewport(0, 0, win.width, win.height)
-
-        # construct perspective projection matrix
-        aspectRatio = (float)(win.width) / win.height
-        tangent = math.tan(FOV_Y / 2.0);     # tangent of half fovY
-        h = N * tangent;                  # half height of near plane
-        w = h * aspectRatio;              # half width of near plane
-        self.matrixProjection = glm.mat4(1.0)
-#        self.matrixProjection[0][0]  =  N / w
-#        self.matrixProjection[1][1]  =  N / h
-#        self.matrixProjection[2][2] = -(F + N) / (F - N)
-#        self.matrixProjection[2][3] = -1 # TODO richtig rum ?
-#        self.matrixProjection[3][2] = -(2 * F * N) / (F - N)
-#        self.matrixProjection[3][3] =  0
-#
-        # set perspective viewing frustum
-#        glMatrixMode(GL_PROJECTION) TODO dies bringt fehler
-#        glLoadMatrixf(glm.value_ptr(self.matrixProjection)) # TODO dies geht nicht
-        #@@ equivalent fixed pipeline
-        #glLoadIdentity()
-        #gluPerspective(60.0f, (float)(screenWidth)/screenHeight, 0.1f, 100.0f); # FOV, AspectRatio, NearClip, FarClip
-
-        # switch to modelview matrix in order to set scene
-#        glMatrixMode(GL_MODELVIEW) TODO dies bringt fehler
-#        glLoadIdentity() # TODO dies bringt fehler
-
-
-    def initGL(self): # TODO is not called
-        glShadeModel(GL_SMOOTH)
+    def initGL(self):
+        glDepthFunc(GL_LESS)
+        glEnable(GL_DEPTH_TEST)
         glPixelStorei(GL_UNPACK_ALIGNMENT,4)
-        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
 
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
         glEnable(GL_CULL_FACE)
-
-        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-        glEnable(GL_COLOR_MATERIAL)
 
         glClearColor(0, 0, 0, 0)                   # background color
         glClearStencil(0)                          # clear stencil buffer
         glClearDepth(1.0)                         # 0 is near, 1 is far
         glDepthFunc(GL_LEQUAL)
-        self.initLights()
+        return
 
     def __init__(self):
         Gtk.GLArea.__init__(self)
@@ -510,6 +416,7 @@ class My3DViewer(Gtk.GLArea):
         self.connect('motion-notify-event',self.pointermotion)
         self.connect('scroll-event',self.scrollevent)
         self.set_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.SCROLL_MASK)
+
 
 
         self.set_double_buffered(GL_FALSE)
