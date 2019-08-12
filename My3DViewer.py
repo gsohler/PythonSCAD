@@ -116,7 +116,6 @@ class My3DViewer(Gtk.GLArea):
             npobj[i*9+7] = 0.8# colors[i*3+1]
             npobj[i*9+8] = 0.1#colors[i*3+2]
 
-        print(npobj)
         self.updateModelSub(npobj,indices)
 
     def updateModel1(self, obj, indices):
@@ -126,7 +125,6 @@ class My3DViewer(Gtk.GLArea):
             for j in range(9):
                npobj[i*9+j] = obj[i][j]
 
-        print(npobj)
         self.updateModelSub(npobj,indices)
 
     def updateModelSub(self,npobj, indices):
@@ -208,18 +206,8 @@ class My3DViewer(Gtk.GLArea):
         # widget.attach_buffers()
         context = widget.get_context()
 
-        print('configure errors')
-        print(widget.get_error())
-
-
         self.initGL()
         self.initGLSL()
-
-
-
-        print('errors')
-        print(widget.get_error())
-
 
         # Generate empty buffer
         self.vbo = glGenBuffers(1) 
@@ -230,8 +218,7 @@ class My3DViewer(Gtk.GLArea):
 
         # Set as current vertex array
 
-
-        self.updateModel(self.vertices,self.normals, self.colors, self.indices)
+        self.updateModel([],[],[],[]) # TODO einfacher
 
         self.queue_draw()
 
@@ -412,9 +399,8 @@ class My3DViewer(Gtk.GLArea):
 
     def __init__(self):
         Gtk.GLArea.__init__(self)
+        self.indices = []
         self.set_required_version(3, 3)
-        self.test_features()
-
 
 # For mouse control
         self.button_pressed = 0
@@ -443,13 +429,6 @@ class My3DViewer(Gtk.GLArea):
         self.set_double_buffered(GL_FALSE)
         self.set_size_request(500, 500)
 
-    def setModel(self,vertices,normals,colors,indices): # TODO besser
-        self.vertices=vertices
-        self.normals=normals
-        self.colors=colors
-        self.indices=indices
-        pass
-
     def renderVertices(self,result):
         pts = [] 
         self.indices = []
@@ -471,12 +450,4 @@ class My3DViewer(Gtk.GLArea):
 
         self.updateModel1(pts, self.indices)
         self.queue_draw()
-
-
-    def test_features(self):
-        print('Testing features')
-        print('glGenVertexArrays Available %s' % bool(glGenVertexArrays))
-        print('Alpha Available %s' % bool(self.get_has_alpha()))
-        print('Depth buffer Available %s' % bool(self.get_has_depth_buffer()))
-
 
