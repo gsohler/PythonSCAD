@@ -100,41 +100,60 @@ class My3DViewer(Gtk.GLArea):
 
     def updateModel(self,vertices,normals, colors, indices):
 
-        obj = np.arange(3*len(vertices),dtype=np.float32)
+
+        npobj = np.arange(3*len(vertices),dtype=np.float32)
         for i in range(int(len(vertices)/3)):
-            obj[i*9+0] = vertices[i*3+0]
-            obj[i*9+1] = vertices[i*3+1]
-            obj[i*9+2] = vertices[i*3+2]
+            npobj[i*9+0] = vertices[i*3+0]
+            npobj[i*9+1] = vertices[i*3+1]
+            npobj[i*9+2] = vertices[i*3+2]
 
-            obj[i*9+3] = normals[i*3+0] 
-            obj[i*9+4] = normals[i*3+1]
-            obj[i*9+5] = normals[i*3+2]
+            npobj[i*9+3] = normals[i*3+0] 
+            npobj[i*9+4] = normals[i*3+1]
+            npobj[i*9+5] = normals[i*3+2]
 
-            obj[i*9+6] = 0.8# colors[i*3+0]
-            obj[i*9+7] = 0.8# colors[i*3+1]
-            obj[i*9+8] = 0.1#colors[i*3+2]
+            npobj[i*9+6] = 0.8# colors[i*3+0]
+            npobj[i*9+7] = 0.8# colors[i*3+1]
+            npobj[i*9+8] = 0.1#colors[i*3+2]
+
+        print(npobj)
+        self.updateModelSub(npobj,indices)
+
+    def updateModel1(self, obj, indices):
+
+        npobj = np.arange(len(obj)*9,dtype=np.float32)
+        for i in range(len(obj)):
+            for j in range(9):
+               npobj[i*9+j] = obj[i][j]
+
+        print(npobj)
+        self.updateModelSub(npobj,indices)
+
+    def updateModelSub(self,npobj, indices):
+
+        glBindVertexArray( self.vao )
 
         npindices = np.array(indices, dtype=np.int32)
 
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
-        glEnableVertexAttribArray(self.attribVertex)
-        glVertexAttribPointer(self.attribVertex, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*0))
+        glEnableVertexAttribArray(self.attribVertexPosition)
+        glVertexAttribPointer(self.attribVertexPosition, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*0))
 
-        glEnableVertexAttribArray(self.attribNormal)
-        glVertexAttribPointer(self.attribNormal, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*3))
+        glEnableVertexAttribArray(self.attribVertexNormal)
+        glVertexAttribPointer(self.attribVertexNormal, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*3))
 
-        glEnableVertexAttribArray(self.attribColor)
-        glVertexAttribPointer(self.attribColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
+        glEnableVertexAttribArray(self.attribVertexColor)
+        glVertexAttribPointer(self.attribVertexColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
 
-        glBufferData(GL_ARRAY_BUFFER,4*3*len(vertices),obj,GL_DYNAMIC_DRAW)
+        glBufferData(GL_ARRAY_BUFFER,4*len(npobj),npobj,GL_DYNAMIC_DRAW)
 
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(indices), npindices, GL_DYNAMIC_DRAW) 
 
-
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+
+        glBindVertexArray( 0 )
 
     def updateTransform(self,phi,theta):
 
@@ -209,7 +228,6 @@ class My3DViewer(Gtk.GLArea):
         self.vao = glGenVertexArrays(1)
 
         # Set as current vertex array
-        glBindVertexArray( self.vao )
 
 
         self.updateModel(self.vertices,self.normals, self.colors, self.indices)
@@ -222,15 +240,14 @@ class My3DViewer(Gtk.GLArea):
     def on_draw(self, widget, *args):
 #        print('render event')
         self.screen=widget.get_allocation()
+        glBindVertexArray( self.vao )
 
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClearDepth(1.0)
 
-        glBindVertexArray( self.vao )
 
         glUseProgram(self.shader)
 
@@ -240,21 +257,11 @@ class My3DViewer(Gtk.GLArea):
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
-#        glColor3f(1.0,0.0,0.0); # red x
+
         glBegin(GL_LINES);
-        # x aix
-        
-        glVertex3f(-4.0, 0.0, 0.0);
-        glVertex3f(4.0, 0.0, 0.0);
-        
-        # arrow
-        glVertex3f(4.0, 0.0, 0.0);
-        glVertex3f(3.0, 1.0, 0.0);
-        
-        glVertex3f(4.0, 0.0, 0.0);
-        glVertex3f(3.0, -1.0, 0.0);
 
         glFlush()
+        glBindVertexArray( 0 )
         return True
 
     def rotate_drag_start(self, x, y, button, modifiers):
@@ -408,9 +415,6 @@ class My3DViewer(Gtk.GLArea):
         self.set_required_version(3, 3)
         self.test_features()
 
-        self.attribVertex=0
-        self.attribNormal=1
-        self.attribColor=2
 
 # For mouse control
         self.button_pressed = 0
@@ -465,21 +469,7 @@ class My3DViewer(Gtk.GLArea):
                 self.indices.append(indices[i+1])
                 self.indices.append(indices[i+2])
 
-        self.vertices = []
-        self.normals = []
-        self.colors = []
-        for pt in pts:
-            self.vertices.append(pt[0])
-            self.vertices.append(pt[1])
-            self.vertices.append(pt[2])
-            self.normals.append(pt[3])
-            self.normals.append(pt[4])
-            self.normals.append(pt[5])
-            self.colors.append(pt[6])
-            self.colors.append(pt[7])
-            self.colors.append(pt[8])
-
-        self.updateModel(self.vertices,self.normals, self.colors, self.indices)
+        self.updateModel1(pts, self.indices)
         self.queue_draw()
 
 
