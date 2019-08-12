@@ -3,6 +3,7 @@
 import os
 import sys
 import math
+import struct
 
 import glm
 
@@ -240,6 +241,9 @@ class My3DViewer(Gtk.GLArea):
     def on_draw(self, widget, *args):
 #        print('render event')
         self.screen=widget.get_allocation()
+
+        glUseProgram(self.shader)
+
         glBindVertexArray( self.vao )
 
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
@@ -248,20 +252,16 @@ class My3DViewer(Gtk.GLArea):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClearDepth(1.0)
 
-
-        glUseProgram(self.shader)
-
-
         glDrawElements(GL_TRIANGLES,len(self.indices),GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
-
-        glBegin(GL_LINES);
-
-        glFlush()
         glBindVertexArray( 0 )
+        glFlush()
+
+        glBegin(GL_LINES); # TODO dies weg
+
         return True
 
     def rotate_drag_start(self, x, y, button, modifiers):

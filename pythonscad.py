@@ -50,11 +50,11 @@ def keypressevent(window, event):
         print("F5 presed")
         render(window)
     if keyval == Gdk.KEY_F6:
-        print("F6 presed")
-#        export_stl(window)
+        export_stl(window)
     if keyval == 65505 or keyval == 65506: # TODO
-        print("Shift presed")
+#        print("Shift presed")
 #        modifiers=1
+        pass
 
 def keyreleaseevent(window, event):
     pass
@@ -168,13 +168,13 @@ def circle(r=1,n=10):
 		faces[i]=[i,(i+1)%n,n]
 	vertices[n]=[0,0]
 
-	meshstack.append(pymesh.form_mesh(vertices,faces))
+	meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
 
 global polygon # TODO
 def polygon(path):
 	n = len(path);
 	edges = np.array([np.arange(n), np.mod(np.arange(n)+1,n)]).T;
-	tri = pymesh.triangle()
+	tri = pymesh.triangle() # TODO fix
 	tri.points = path
 	tri.segments = edges
 	tri.split_boundary = False
@@ -320,7 +320,7 @@ def bezier_surface(pts,n=5,zmin=-1):
 			faces[faceoffset]=[sockel[(i+1)%l],sockel[i],ci]
 			faceoffset=faceoffset+1
 
-	meshstack.append(pymesh.form_mesh(vertices,faces))
+	meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
 
 global cube
 def cube(dim=[1,1,1]):
@@ -357,7 +357,7 @@ def cone(h=1,r=1,n=16):
 
 #global tetrahedron
 #def tetrahedron(r=1):
-#	meshstack.append(pymesh.generate_regular_tetrahedron(r))
+#	meshstack.append(pymesh.generate_regular_tetrahedron(r)) # TODO fix
 #
 #global dodecahedron
 #def dodecahedron(r=1):
@@ -539,7 +539,7 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
 					i2=i2+1
 
 
-	meshstack.append(pymesh.form_mesh(vertices,faces))
+	meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
 
 
 global linear_extrude
@@ -659,8 +659,8 @@ def ang_convert(span,steps):
 	result=None
 	step=1.0*span/steps
 	for i in range(steps):
-		mask=pymesh.generate_box_mesh([step*i,-100,-100],[step*(i+1),100,100])
-		slice=pymesh.boolean(obj,mask,"intersection")
+		mask=pymesh.generate_box_mesh([step*i,-100,-100],[step*(i+1),100,100]) # TODO fix
+		slice=pymesh.boolean(obj,mask,"intersection") # TODO fix
 
 		vertices = np.empty([len(slice.vertices),3],dtype=float)
 		for i in range(len(slice.vertices)):
@@ -669,11 +669,11 @@ def ang_convert(span,steps):
 			vertices[i][0]=-r*math.cos(ang)
 			vertices[i][1]=r*math.sin(ang)
 			vertices[i][2]=slice.vertices[i][2]
-		tmp=pymesh.form_mesh(vertices,slice.faces)
+		tmp=pymesh.form_mesh(vertices,slice.faces) # TODO fix
 		if result is None:
 			result = tmp
 		else:
-			result =pymesh.boolean(result,tmp,"union")
+			result =pymesh.boolean(result,tmp,"union") # TODO fix
 		meshstack.append(result)
 
 
@@ -707,14 +707,14 @@ def scale(s):
 			vertices[i][0]=obj.vertices[i][0]*s[0]
 			vertices[i][1]=obj.vertices[i][1]*s[1]
 			vertices[i][2]=obj.vertices[i][2]*s[2]
-		meshstack.append(pymesh.form_mesh(vertices,obj.faces))
+		meshstack.append(pymesh.form_mesh(vertices,obj.faces)) # TODO fix
 	elif dim == 2:
 		if type(s) is not list:
 			s = [s,s]
 		for i in range(len(obj.vertices)):
 			vertices[i][0]=obj.vertices[i][0]*s[0]
 			vertices[i][1]=obj.vertices[i][1]*s[1]
-		meshstack.append(pymesh.form_mesh(vertices,obj.faces))
+		meshstack.append(pymesh.form_mesh(vertices,obj.faces)) # TODO fix
 	else:
 		message("Dimension %d not supported"%(dim))
 
@@ -749,7 +749,7 @@ def mirror(v):
 		faces[i][0]=obj.faces[i][0]
 		faces[i][1]=obj.faces[i][2]
 		faces[i][2]=obj.faces[i][1]
-	meshstack.append(pymesh.form_mesh(vertices,faces))
+	meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
 
 
 global CutPlaneStraight
@@ -782,7 +782,7 @@ def size(s=1.0):
 		return
 	obj=meshstack.pop()
 
-	obj=pymesh.resolve_self_intersection(obj)
+	obj=pymesh.resolve_self_intersection(obj) # TODO fix
 
 	# gemeinsame flaechen weg, kanten verlaengern
 	obj.add_attribute("face_normal")
@@ -851,9 +851,9 @@ def size(s=1.0):
 		else:
 			vertices[i]=sp # Kompromiss
 
-	obj=pymesh.resolve_self_intersection(obj)
-# pymesh.nerge_meshes
-	obj=pymesh.form_mesh(vertices,obj.faces)
+	obj=pymesh.resolve_self_intersection(obj) # TODO fix
+# pymesh.nerge_meshes # TODO fix
+	obj=pymesh.form_mesh(vertices,obj.faces) # TODO fix
 	meshstack.append(obj)
 
 
@@ -956,7 +956,7 @@ def concat(n=2):
 
 		vertoff = vertoff + len(obj.vertices)
 		faceoff = faceoff + len(obj.faces)
-	obj=pymesh.form_mesh(vertices,faces)
+	obj=pymesh.form_mesh(vertices,faces) # TODO fix
 	meshstack.append(obj)
 
 
@@ -967,7 +967,7 @@ def hull():
 		return
 
 	obj=meshstack.pop()
-	obj=pymesh.convex_hull(obj)
+	obj=pymesh.convex_hull(obj) # TODO fix
 	meshstack.append(obj)
 
 global intersection
@@ -1049,7 +1049,7 @@ def render(window):
 #		meshstack.append(mesh)
 #		linear_extrude(1)
 #		mesh=meshstack[0]
-#	meshstack.append(mesh)
+	meshstack.append(mesh)
 
 
 #	if len(mesh.vertices[0]) != 3:
@@ -1090,12 +1090,34 @@ def save_script(window):
 		outfile.write(script)
 		outfile.close()
 
+def export_stl_cb(mesh,filename):
+        print("Saving STL")
+
+        polygons=mesh.toPolygons()
+        trianglelen=0
+        for polygon in polygons:
+                trianglelen = trianglelen +len( polygon.vertices) -2
+
+        with open(filename,'wb') as f:
+                f.write(struct.pack("<IIIIIIIIIIIIIIIIIIII", 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0))
+                f.write(struct.pack("<I", trianglelen))
+                for polygon in polygons:
+                        n = polygon.plane.normal
+                        pts = polygon.vertices
+                        for i in range(len(pts)-2):
+                                p1 = pts[0] # TODO delauney
+                                p2 = pts[i+1]
+                                p3 = pts[i+2]
+                                data = struct.pack('<ffffffffffff',n.x,n.y,n.z,p1.pos.x,p1.pos.y,p1.pos.z,p2.pos.x,p2.pos.y,p2.pos.z,p3.pos.x,p3.pos.y,p3.pos.z)
+                                f.write(data)
+                                f.write(struct.pack('<bb',0,0))
 
 def export_stl(window):
 	if len(meshstack) == 0:
 		message( "Error: No Objects generated")
-		viewer.renderVertices() # TODO fix
+#		viewer.renderVertices() # TODO fix
 		return
+        # TODO hier auch union
 	mesh = meshstack[0]
 	text_filter=Gtk.FileFilter()
 	text_filter.set_name("Text files")
@@ -1105,17 +1127,17 @@ def export_stl(window):
 	all_filter.add_pattern("*")
 
 	filename=None
-	dialog=Gtk.FileChooserDialog(title="Select a File", action=Gtk.FILE_CHOOSER_ACTION_SAVE,
-		buttons=(Gtk.STOCK_CANCEL, Gtk.RESPONSE_CANCEL, Gtk.STOCK_SAVE, Gtk.RESPONSE_OK))
+	dialog=Gtk.FileChooserDialog(title="Select a File", action=Gtk.FileChooserAction.SAVE,
+		buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
 
 	dialog.add_filter(text_filter)
 	dialog.add_filter(all_filter)
 
 	response = dialog.run()
 
-	if response == Gtk.RESPONSE_OK:
+	if response == Gtk.ResponseType.OK:
 		filename = dialog.get_filename()
-		pymesh.save_mesh(filename, mesh);
+		export_stl_cb(mesh,filename)
 		message("File Exported")
 	dialog.destroy()
 
