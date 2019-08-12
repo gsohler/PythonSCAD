@@ -1186,20 +1186,10 @@ indices = [
 
 
 
-win = Gtk.Window()
-win.set_title("PythonSCAD")
-
-win.set_reallocate_redraws(True)
-
-win.connect('destroy', Gtk.main_quit)
 
 viewer3d = My3DViewer()
 viewer3d.setModel(vertices,normals,colors,indices)
 viewer3d.set_size_request(500, 600)
-
-hbox = Gtk.HPaned()
-hbox.add(tvscroll)
-hbox.add(viewer3d)
 
 filesave = Gtk.MenuItem("Save")
 filesave.connect("activate", save_script)
@@ -1223,13 +1213,35 @@ mb.append(filem)
 
 vbox = Gtk.VBox(False, 2)
 vbox.pack_start(mb, False, False, 0)
-vbox.add(hbox)
+vbox.add(tvscroll)
 
-win.add(vbox)
-win.connect('key-press-event',keypressevent)
-win.connect('key-release-event',keyreleaseevent)
+# Script Window
 
-win.show_all()
+win_source = Gtk.Window()
+win_source.set_title("PythonSCAD - Source")
+win_source.set_reallocate_redraws(True)
+win_source.connect('destroy', Gtk.main_quit)
+
+win_source.add(vbox)
+win_source.connect('key-press-event',keypressevent)
+win_source.connect('key-release-event',keyreleaseevent)
+
+win_source.show_all()
+
+
+# 3D Window
+
+win_graph = Gtk.Window()
+win_graph.set_title("PythonSCAD - Viewer")
+win_graph.set_reallocate_redraws(True)
+win_graph.connect('destroy', Gtk.main_quit)
+
+win_graph.add(viewer3d)
+win_graph.connect('key-press-event',keypressevent)
+win_graph.connect('key-release-event',keyreleaseevent)
+
+win_graph.show_all()
+
 Gtk.main()
 
 # vim: softtabstop=8 noexpandtab
