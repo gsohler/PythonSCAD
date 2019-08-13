@@ -120,9 +120,7 @@ def dump():
             print("%.2f/%.2f, "%(v[0],v[1]),end='')
         print("\n2D Faces")
         for face in obj.faces:
-            print("[",end=' ')
             print(face)
-            print("]")
         
     else:
         print("3D Polygons :")
@@ -143,8 +141,12 @@ def dup(n=1):
 
 class Object2d:
     def __init__(self):
-        self.vertices=[]
-        self.faces=[]
+        self.vertices=None
+        self.faces=None
+
+def form_mesh(vertices, faces):
+    print("Here happens a pycsg wonder")
+
 
 global square
 def square(s=1): # TODO
@@ -155,8 +157,17 @@ def square(s=1): # TODO
         w=s[0]
         l=s[1]
     obj=Object2d()
-    obj.vertices=[[0,0],[w,0],[w,l],[0,l]]
-    obj.faces=[[0,1,2,3]]
+    obj.vertices = np.empty([4,2],dtype=float)
+    obj.vertices[0]=[0,0]
+    obj.vertices[1]=[w,0]
+    obj.vertices[2]=[w,l]
+    obj.vertices[3]=[0,l]
+
+    obj.faces = np.empty([2,3],dtype=int)
+    obj.faces[0]=[0,1,2]
+    obj.faces[1]=[0,2,3]
+
+
     meshstack.append(obj)
 
 global circle     # TODO
@@ -458,9 +469,9 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
         p1 = profile[x]
         p2 = profile[(x+1)%layers]
         for p in p1:
-            faces_num = faces_num+len(p)/(nd-2)
+            faces_num = faces_num+int(len(p)/(nd-2))
         for p in p2:
-            faces_num = faces_num+len(p)/(nd-2)
+            faces_num = faces_num+int(len(p)/(nd-2))
 
     faceoff=0
 
@@ -521,7 +532,7 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
                     i2=i2+1
 
 
-    meshstack.append(CSG.form_mesh(vertices,faces)) # TODO fix
+    meshstack.append(form_mesh(vertices,faces))
 
 
 global linear_extrude
@@ -531,16 +542,16 @@ def linear_extrude(height=1,n=2,func=None):
             message("No Object to extrude")
             return
         obj=meshstack.pop()
-        profile=obj[0] # TODO
-        nv=len(profile) # TODO
+        nv=len(obj.vertices)
+        profile=triangle_combine(obj.faces)
     else:
         vertices = None
-
-    print("Profile")
-    print(profile)
+    
     profiles = []
     layers=n
     conns=layers-1
+
+
 
     # Generate Points
     vertices = np.empty([layers*nv,3],dtype=float)
