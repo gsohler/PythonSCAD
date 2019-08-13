@@ -112,21 +112,32 @@ def on_text_view_expose_event(text_view, event):
 meshstack = []
 
 global dump
-def dump(): # TODO
+def dump(): 
 	obj=meshstack[-1]
-	print("Vertices")
-	print(obj.vertices)
-	print("Faces")
-	print(obj.faces)
+	if type(obj) is dict:
+		print("2D Vertices")
+		for poly in obj.vertices:
+			print("(",end=' ')
+			for v in poly:
+				print("%.2f/%.2f, "%(v[0],v[1]),end='')
+			print(")")
+		
+	else:
+		print("3D Polygons :")
+		for poly in obj.polygons:
+			print("(",end=' ')
+			for v in poly.vertices:
+				print("%.2f/%.2f/%.2f, "%(v.pos.x,v.pos.y,v.pos.z),end='')
+			print(")")
 
 global dup
 def dup(n=1):
 	if len(meshstack) == 0:
 		message("No Object to dup")
 		return
-	obj=meshstack.pop()
-	for i in range(n+1):
-		meshstack.append(obj)
+	obj=meshstack[-1]
+	for i in range(n):
+		meshstack.append(obj.clone())
 
 
 
@@ -138,22 +149,12 @@ def square(s=1): # TODO
 	else:
 		w=s[0]
 		l=s[1]
-	vertices = np.empty([4,2],dtype=float)
-	vertices[0]=[0,0]
-	vertices[1]=[w,0]
-	vertices[2]=[w,l]
-	vertices[3]=[0,l]
-	nd=3
-
-	if nd == 4:
-		faces = np.empty([1,nd],dtype=int)
-		faces[0]=[0,1,2,3]
-	if nd == 3:
-		faces = np.empty([2,nd],dtype=int)
-		faces[0]=[0,1,2]
-		faces[1]=[0,2,3]
-
-	meshstack.append(pymesh.form_mesh(vertices,faces))
+	vertices=[[[0,0],[w,0],[w,l],[0,l]]]
+	faces=[[0,1,2,3]]
+	obj={}
+	obj.vertices=vertices
+	obj.faces=faces
+	meshstack.append(obj)
 
 global circle	 # TODO
 def circle(r=1,n=10):
@@ -167,13 +168,13 @@ def circle(r=1,n=10):
 		faces[i]=[i,(i+1)%n,n]
 	vertices[n]=[0,0]
 
-	meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
+	meshstack.append(CSG.form_mesh(vertices,faces)) # TODO fix
 
 global polygon # TODO
 def polygon(path):
 	n = len(path);
 	edges = np.array([np.arange(n), np.mod(np.arange(n)+1,n)]).T;
-	tri = pymesh.triangle() # TODO fix
+	tri = CSG.triangle() # TODO fix
 	tri.points = path
 	tri.segments = edges
 	tri.split_boundary = False
@@ -319,7 +320,7 @@ def bezier_surface(pts,n=5,zmin=-1):
 			faces[faceoffset]=[sockel[(i+1)%l],sockel[i],ci]
 			faceoffset=faceoffset+1
 
-	meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
+	meshstack.append(CSG.form_mesh(vertices,faces)) # TODO fix
 
 global cube
 def cube(dim=[1,1,1]):
@@ -342,30 +343,9 @@ def cone(h=1,r=1,n=16):
 	obj = CSG.cone(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
 	meshstack.append(obj)
 
-# TODO
-#global tube
-#def tube(h=1,ro=1,ri=0.5,r1o=None,r2o=None,r1i=None,r2i=None,n=16):
-#	if r1o is None:
-#		r1o=ro
-#	if r2o is None:
-#		r2o=ro
-#	if r1i is None:
-#		r1i=ri
-#	if r2i is None:
-#		r2i=ri
-
-#global tetrahedron
-#def tetrahedron(r=1):
-#	meshstack.append(pymesh.generate_regular_tetrahedron(r)) # TODO fix
-#
-#global dodecahedron
-#def dodecahedron(r=1):
-#	dod=pymesh.generate_dodecahedron(r,[0,0,0])
-#	meshstack.append(dod)
-#
 #global import_obj
 #def import_obj(filename):
-#	obj=pymesh.load_mesh(filename)
+#	obj=CSG.load_mesh(filename)
 #	meshstack.append(obj)
 
 
@@ -538,7 +518,7 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
 					i2=i2+1
 
 
-	meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
+	meshstack.append(CSG.form_mesh(vertices,faces)) # TODO fix
 
 
 global linear_extrude
@@ -548,11 +528,13 @@ def linear_extrude(height=1,n=2,func=None):
 			message("No Object to extrude")
 			return
 		obj=meshstack.pop()
-		nv=len(obj.vertices)
-		profile=triangle_combine(obj.faces)
+		profile=obj[0] # TODO
+		nv=len(profile) # TODO
 	else:
 		vertices = None
 
+	print("Profile")
+	print(profile)
 	profiles = []
 	layers=n
 	conns=layers-1
@@ -658,8 +640,8 @@ def ang_convert(span,steps):
 	result=None
 	step=1.0*span/steps
 	for i in range(steps):
-		mask=pymesh.generate_box_mesh([step*i,-100,-100],[step*(i+1),100,100]) # TODO fix
-		slice=pymesh.boolean(obj,mask,"intersection") # TODO fix
+		mask=CSG.generate_box_mesh([step*i,-100,-100],[step*(i+1),100,100]) # TODO fix
+		slice=CSG.boolean(obj,mask,"intersection") # TODO fix
 
 		vertices = np.empty([len(slice.vertices),3],dtype=float)
 		for i in range(len(slice.vertices)):
@@ -668,11 +650,11 @@ def ang_convert(span,steps):
 			vertices[i][0]=-r*math.cos(ang)
 			vertices[i][1]=r*math.sin(ang)
 			vertices[i][2]=slice.vertices[i][2]
-		tmp=pymesh.form_mesh(vertices,slice.faces) # TODO fix
+		tmp=CSG.form_mesh(vertices,slice.faces) # TODO fix
 		if result is None:
 			result = tmp
 		else:
-			result =pymesh.boolean(result,tmp,"union") # TODO fix
+			result =CSG.boolean(result,tmp,"union") # TODO fix
 		meshstack.append(result)
 
 
@@ -706,7 +688,7 @@ def scale(s):
 			vertices[i][0]=obj.vertices[i][0]*s[0]
 			vertices[i][1]=obj.vertices[i][1]*s[1]
 			vertices[i][2]=obj.vertices[i][2]*s[2]
-		meshstack.append(pymesh.form_mesh(vertices,obj.faces)) # TODO fix
+		meshstack.append(CSG.form_mesh(vertices,obj.faces)) # TODO fix
 	elif dim == 2:
 		if type(s) is not list:
 			s = [s,s]
@@ -899,14 +881,14 @@ def pop():
 	return meshstack.pop()
 
 global push
-def push(x): # TODO hier copy
-	meshstack.append(x)
+def push(x):
+	meshstack.append(x.clone())
 
 viewer_obj = None
 global show
 def show(obj):
-        global viewer_obj
-        viewer_obj=obj
+	global viewer_obj
+	viewer_obj=obj
 
 ####
 
@@ -932,55 +914,55 @@ def union(n=2):
 		obj1 =obj1.union(obj2)
 	meshstack.append(obj1)
 
-global concat
-def concat(n=2):
-	if n == 1:
-		return
-		message("Too less Objects for Concat")
-		return
-	objs=[]
+#global concat
+#def concat(n=2):
+#	if n == 1:
+#		return
+#		message("Too less Objects for Concat")
+#		return
+#	objs=[]
+#
+#	# Calculate number of required vertices and faces
+#	vertlen=0
+#	facelen=0
+#	for i in range(n):
+#		obj=meshstack.pop()
+#		vertlen += len(obj.vertices)
+#		facelen += len(obj.faces)
+#		objs.append(obj)
+#
+#
+#	vertices = np.empty([vertlen,3],dtype=float)
+#	faces = np.empty([facelen,3],dtype=int)
+#
+#	# Now concatenate all vertices and faces
+#	vertoff=0
+#	faceoff=0
+#	for i in range(n):
+#		obj=objs[i]
+#		for j in range(len(obj.vertices)):
+#			vert=obj.vertices[j]
+#			vertices[j+vertoff]=vert
+#
+#		for j in range(len(obj.faces)):
+#			face=obj.faces[j]
+#			faces[j+faceoff] = [face[0]+vertoff,face[1]+vertoff,face[2]+vertoff]
+#
+#		vertoff = vertoff + len(obj.vertices)
+#		faceoff = faceoff + len(obj.faces)
+#	obj=pymesh.form_mesh(vertices,faces) # TODO fix
+#	meshstack.append(obj)
 
-	# Calculate number of required vertices and faces
-	vertlen=0
-	facelen=0
-	for i in range(n):
-		obj=meshstack.pop()
-		vertlen += len(obj.vertices)
-		facelen += len(obj.faces)
-		objs.append(obj)
 
-
-	vertices = np.empty([vertlen,3],dtype=float)
-	faces = np.empty([facelen,3],dtype=int)
-
-	# Now concatenate all vertices and faces
-	vertoff=0
-	faceoff=0
-	for i in range(n):
-		obj=objs[i]
-		for j in range(len(obj.vertices)):
-			vert=obj.vertices[j]
-			vertices[j+vertoff]=vert
-
-		for j in range(len(obj.faces)):
-			face=obj.faces[j]
-			faces[j+faceoff] = [face[0]+vertoff,face[1]+vertoff,face[2]+vertoff]
-
-		vertoff = vertoff + len(obj.vertices)
-		faceoff = faceoff + len(obj.faces)
-	obj=pymesh.form_mesh(vertices,faces) # TODO fix
-	meshstack.append(obj)
-
-
-global hull
-def hull():
-	if len(meshstack) == 0:
-		message("No Object to hull")
-		return
-
-	obj=meshstack.pop()
-	obj=pymesh.convex_hull(obj) # TODO fix
-	meshstack.append(obj)
+#global hull
+#def hull():
+#	if len(meshstack) == 0:
+#		message("No Object to hull")
+#		return
+#
+#	obj=meshstack.pop()
+#	obj=pymesh.convex_hull(obj) # TODO fix
+#	meshstack.append(obj)
 
 global intersection
 def intersection(n=2):
@@ -1030,13 +1012,13 @@ def volume():
 ####################################
 
 def get_result(): # TODO verbessern
-        global viewer_obj
-        if viewer_obj is not None:
-        	return viewer_obj
-        if len(meshstack) > 0:
-                union(len(meshstack))
-                return meshstack[0]
-        return None
+	global viewer_obj
+	if viewer_obj is not None:
+		return viewer_obj
+	if len(meshstack) > 0:
+		union(len(meshstack))
+		return meshstack[0]
+	return None
 
 
 
@@ -1097,26 +1079,26 @@ def save_script(window):
 		outfile.close()
 
 def export_stl_cb(mesh,filename):
-        print("Saving STL")
+	print("Saving STL")
 
-        polygons=mesh.toPolygons()
-        trianglelen=0
-        for polygon in polygons:
-                trianglelen = trianglelen +len( polygon.vertices) -2
+	polygons=mesh.toPolygons()
+	trianglelen=0
+	for polygon in polygons:
+		trianglelen = trianglelen +len( polygon.vertices) -2
 
-        with open(filename,'wb') as f:
-                f.write(struct.pack("<IIIIIIIIIIIIIIIIIIII", 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0))
-                f.write(struct.pack("<I", trianglelen))
-                for polygon in polygons:
-                        n = polygon.plane.normal
-                        pts = polygon.vertices
-                        for i in range(len(pts)-2):
-                                p1 = pts[0] # TODO delauney
-                                p2 = pts[i+1]
-                                p3 = pts[i+2]
-                                data = struct.pack('<ffffffffffff',n.x,n.y,n.z,p1.pos.x,p1.pos.y,p1.pos.z,p2.pos.x,p2.pos.y,p2.pos.z,p3.pos.x,p3.pos.y,p3.pos.z)
-                                f.write(data)
-                                f.write(struct.pack('<bb',0,0))
+	with open(filename,'wb') as f:
+		f.write(struct.pack("<IIIIIIIIIIIIIIIIIIII", 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0))
+		f.write(struct.pack("<I", trianglelen))
+		for polygon in polygons:
+			n = polygon.plane.normal
+			pts = polygon.vertices
+			for i in range(len(pts)-2):
+				p1 = pts[0] # TODO delauney
+				p2 = pts[i+1]
+				p3 = pts[i+2]
+				data = struct.pack('<ffffffffffff',n.x,n.y,n.z,p1.pos.x,p1.pos.y,p1.pos.z,p2.pos.x,p2.pos.y,p2.pos.z,p3.pos.x,p3.pos.y,p3.pos.z)
+				f.write(data)
+				f.write(struct.pack('<bb',0,0))
 
 def export_stl(window):
 	if len(meshstack) == 0:
@@ -1151,6 +1133,8 @@ parser.add_argument("file", help="Graphics  File")
 parser.add_argument("-s", "--scale", help="Scale(1.0)",default=1.0)
 args = parser.parse_args()
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+separateWindow=True
 
 # https://gist.github.com/otsaloma/1912166
 tv = MyTextView()
@@ -1197,12 +1181,18 @@ mb.append(filem)
 
 vbox = Gtk.VBox(False, 2)
 vbox.pack_start(mb, False, False, 0)
-vbox.add(tvscroll)
+if separateWindow == True:
+    vbox.add(tvscroll)
+else:
+    hbox = Gtk.HPaned()
+    hbox.add(tvscroll)
+    hbox.add(viewer3d)
+    vbox.add(hbox)
 
 # Script Window
 
 win_source = Gtk.Window()
-win_source.set_title("PythonSCAD - Source")
+win_source.set_title("PythonSCAD")
 win_source.set_reallocate_redraws(True)
 win_source.connect('destroy', Gtk.main_quit)
 
@@ -1212,19 +1202,18 @@ win_source.connect('key-release-event',keyreleaseevent)
 
 win_source.show_all()
 
+if separateWindow == True:
+    # 3D Window
+    win_graph = Gtk.Window()
+    win_graph.set_title("PythonSCAD - Viewer")
+    win_graph.set_reallocate_redraws(True)
+    win_graph.connect('destroy', Gtk.main_quit)
 
-# 3D Window
+    win_graph.add(viewer3d)
+    win_graph.connect('key-press-event',keypressevent)
+    win_graph.connect('key-release-event',keyreleaseevent)
 
-win_graph = Gtk.Window()
-win_graph.set_title("PythonSCAD - Viewer")
-win_graph.set_reallocate_redraws(True)
-win_graph.connect('destroy', Gtk.main_quit)
-
-win_graph.add(viewer3d)
-win_graph.connect('key-press-event',keypressevent)
-win_graph.connect('key-release-event',keyreleaseevent)
-
-win_graph.show_all()
+    win_graph.show_all()
 
 Gtk.main()
 
