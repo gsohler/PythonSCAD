@@ -37,15 +37,14 @@ listind = -1
 ####################################
 
 def keypressevent(window, event):
-#    print("keypress")
-#    global modifiers
+    global modifiers
     keyval = event.keyval
 #    print(keyval)
 
     if keyval == Gdk.KEY_F1:
-        print("F1 presed")
-#        save_script(window)
-#        message( "Script saved")
+        print("F1 pressed")
+        save_script(window)
+        message( "Script saved")
     if keyval == Gdk.KEY_F5:
         print("F5 presed")
         render(window)
@@ -53,16 +52,16 @@ def keypressevent(window, event):
         export_stl(window)
     if keyval == 65505 or keyval == 65506: # TODO
 #        print("Shift presed")
-#        modifiers=1
+        modifiers=1
         pass
 
 def keyreleaseevent(window, event):
-    pass
-#    global modifiers
+    global modifiers
+    keyval = event.keyval
 #   keyname = Gtk.gdk.keyval_name(event.keyval)
 #    keyname=""
-#    if keyname == "Shift_L" or keyname == "Shift_R":
-#        modifiers=0
+    if keyval == 65505 or keyval == 65506: # TODO
+        modifiers=0
 
 
 def message(str):
@@ -895,6 +894,20 @@ def back():
 	translate([-1000,-1000,-1000])
 	intersection()
 
+global pop
+def pop():
+	return meshstack.pop()
+
+global push
+def push(x): # TODO hier copy
+	meshstack.append(x)
+
+viewer_obj = None
+global show
+def show(obj):
+        global viewer_obj
+        viewer_obj=obj
+
 ####
 
 global difference
@@ -904,7 +917,7 @@ def difference():
 		return
 	obj2=meshstack.pop()
 	obj1=meshstack.pop()
-	meshstack.append(obj1.inverse().union(obj2).inverse())
+	meshstack.append(obj1.subtract(obj2))
 
 global union
 def union(n=2):
@@ -923,7 +936,6 @@ global concat
 def concat(n=2):
 	if n == 1:
 		return
-	if len(meshstack) < n:
 		message("Too less Objects for Concat")
 		return
 	objs=[]
@@ -1017,10 +1029,23 @@ def volume():
 # Top
 ####################################
 
+def get_result(): # TODO verbessern
+        global viewer_obj
+        if viewer_obj is not None:
+        	return viewer_obj
+        if len(meshstack) > 0:
+                union(len(meshstack))
+                return meshstack[0]
+        return None
+
+
+
+
+
 def render(window):
 	global meshstack
-#	model.items = []
 	meshstack = []
+	viewer_obj=None
 
 	try:
 		buffer = tv.get_buffer()
@@ -1029,33 +1054,14 @@ def render(window):
 	except Exception:
 		message("Error in Script")
 		traceback.print_exc()
-#		viewer.renderVertices()
 		return
 
-	if len(meshstack) == 0:
+	mesh = get_result()
+
+	if mesh is None:
 		message( "Error: No Objects generated")
-#		viewer.renderVertices()
 		return
 
-	if(len(meshstack) > 1):
-		union(len(meshstack))
-
-	mesh=meshstack.pop()
-#	if len(mesh) == 0:
-#		viewer.renderVertices()
-#		return
-
-#	if len(mesh.vertices[0]) == 2:
-#		meshstack.append(mesh)
-#		linear_extrude(1)
-#		mesh=meshstack[0]
-	meshstack.append(mesh)
-
-
-#	if len(mesh.vertices[0]) != 3:
-#		message( "Not a a 3D Object")
-#		viewer.renderVertices()
-#		return
 
 	polygons=mesh.toPolygons()
 	ptmin = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
@@ -1115,10 +1121,8 @@ def export_stl_cb(mesh,filename):
 def export_stl(window):
 	if len(meshstack) == 0:
 		message( "Error: No Objects generated")
-#		viewer.renderVertices() # TODO fix
 		return
-        # TODO hier auch union
-	mesh = meshstack[0]
+	mesh = get_result()
 	text_filter=Gtk.FileFilter()
 	text_filter.set_name("Text files")
 	text_filter.add_mime_type("text/*")
@@ -1153,6 +1157,7 @@ tv = MyTextView()
 
 tvscroll = Gtk.ScrolledWindow()
 tvscroll.set_min_content_width(300)
+tvscroll.set_size_request(500, 600)
 tvscroll.add(tv)
 
 if args.file.endswith(".py"):

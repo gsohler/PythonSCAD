@@ -156,21 +156,19 @@ class My3DViewer(Gtk.GLArea):
 
     def updateTransform(self,phi,theta):
 
-        new=True
-
         glUseProgram(self.shader)
 
-        matrixModelModel = glm.mat4(1.0) # Modell wird nicht gedreht
-        glUniformMatrix4fv(self.uniformMatrixModelModel,1,GL_FALSE,glm.value_ptr(matrixModelModel))
+        self.matrixModelModel = glm.mat4(1.0) # Modell wird nicht gedreht
+        glUniformMatrix4fv(self.uniformMatrixModelModel,1,GL_FALSE,glm.value_ptr(self.matrixModelModel))
 
-        matrixModelView = glm.mat4(1.0)
-        matrixModelView = glm.translate(matrixModelView,glm.vec3(self.PX,self.PY,-self.zoom))
-        matrixModelView = glm.rotate(matrixModelView,-glm.radians(phi),glm.vec3(1,0,0))
-        matrixModelView = glm.rotate(matrixModelView,glm.radians(theta),glm.vec3(0,1,0))
-        glUniformMatrix4fv(self.uniformMatrixModelView,1,GL_FALSE,glm.value_ptr(matrixModelView))
+        self.matrixModelView = glm.mat4(1.0)
+        self.matrixModelView = glm.translate(self.matrixModelView,glm.vec3(self.PX,self.PY,-self.zoom))
+        self.matrixModelView = glm.rotate(self.matrixModelView,-glm.radians(phi),glm.vec3(1,0,0))
+        self.matrixModelView = glm.rotate(self.matrixModelView,glm.radians(theta),glm.vec3(0,1,0))
+        glUniformMatrix4fv(self.uniformMatrixModelView,1,GL_FALSE,glm.value_ptr(self.matrixModelView))
 
-        matrixModelProjection=glm.perspective(glm.radians(45),self.screen.width/self.screen.height, 0.1, 100.0) 
-        glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,GL_FALSE,glm.value_ptr(matrixModelProjection))
+        self.matrixModelProjection=glm.perspective(glm.radians(45),self.screen.width/self.screen.height, 0.1, 100.0) 
+        glUniformMatrix4fv(self.uniformMatrixModelViewProjection,1,GL_FALSE,glm.value_ptr(self.matrixModelProjection))
 
     def initGLSL(self):
         self.createShader()
@@ -220,6 +218,8 @@ class My3DViewer(Gtk.GLArea):
 
         self.updateModel([],[],[],[]) # TODO einfacher
 
+        self.matrixModelView = None
+
         self.queue_draw()
 
         return True
@@ -228,6 +228,9 @@ class My3DViewer(Gtk.GLArea):
     def on_draw(self, widget, *args):
 #        print('render event')
         self.screen=widget.get_allocation()
+
+        if self.matrixModelView is None:
+            self.updateTransform(self.RX,self.RZ)
 
         glUseProgram(self.shader)
 
