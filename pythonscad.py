@@ -688,7 +688,12 @@ def translate(off):
         return
 
     obj=meshstack.pop()
-    obj.translate(off)
+    if isinstance(obj,Object2d):
+        for vert in obj.vertices:
+            vert[0] = vert[0] + off[0]
+            vert[1] = vert[1] + off[1]
+    else:
+        obj.translate(off)
     meshstack.append(obj)
 
 
@@ -1040,6 +1045,8 @@ def get_result(): # TODO verbessern
     if viewer_obj is not None:
         return viewer_obj
     if len(meshstack) > 0:
+        if isinstance(meshstack[0],Object2d):
+            linear_extrude(1)
         union(len(meshstack))
         return meshstack[0]
     return None
@@ -1238,6 +1245,8 @@ if separateWindow == True:
     win_graph.connect('key-release-event',keyreleaseevent)
 
     win_graph.show_all()
+    pos=win_source.get_position()
+    win_graph.move(pos.root_x+500,pos.root_y)
 
 Gtk.main()
 
