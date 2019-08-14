@@ -27,7 +27,7 @@ gi.require_version('Gtk','3.0')
 from gi.repository import Gtk
 
 from csg.core import CSG
-from csg.geom import Vertex, Vector
+from csg.geom import Vertex, Vector, Polygon
 
 from My3DViewer import *
 
@@ -145,11 +145,17 @@ class Object2d:
         self.faces=None
 
 def form_mesh(vertices, faces):
-    print("Here happens a pycsg wonder")
+    polygons=[]
+    for face in faces:
+        newvertices = []
+        for ind in face:
+            newvertices.append(Vertex(Vector(vertices[ind][0],vertices[ind][1],vertices[ind][2])))
+        polygons.append(Polygon(newvertices))
+    return CSG.fromPolygons(polygons)
 
 
 global square
-def square(s=1): # TODO
+def square(s=1):
     if type(s) is not list:
         w=s
         l=s
@@ -170,34 +176,33 @@ def square(s=1): # TODO
 
     meshstack.append(obj)
 
-global circle     # TODO
+global circle
 def circle(r=1,n=10):
-    vertices = np.empty([n+1,2],dtype=float)
-    faces = np.empty([n,3],dtype=int)
+    obj=Object2d()
+    obj.vertices = np.empty([n+1,2],dtype=float)
+    obj.faces = np.empty([n,3],dtype=int)
     for i in range(n):
-        vertices[i]=[
+        obj.vertices[i]=[
             r*math.cos(2*math.pi*i/n),
             r*math.sin(2*math.pi*i/n)
         ]
-        faces[i]=[i,(i+1)%n,n]
-    vertices[n]=[0,0]
+        obj.faces[i]=[i,(i+1)%n,n]
+    obj.vertices[n]=[0,0]
+    meshstack.append(obj)
 
-    meshstack.append(CSG.form_mesh(vertices,faces)) # TODO fix
-
-global polygon # TODO
+global polygon
 def polygon(path):
     n = len(path);
-    edges = np.array([np.arange(n), np.mod(np.arange(n)+1,n)]).T;
-    tri = CSG.triangle() # TODO fix
-    tri.points = path
-    tri.segments = edges
-    tri.split_boundary = False
-    tri.verbosity = 0
-    tri.run()
-    meshstack.append(tri.mesh)
+    obj=Object2d()
+    obj.vertices = np.empty([n,2],dtype=float)
+    for i in range(len(path)):
+        obj.vertices[i][0]=path[i][0]
+        obj.vertices[i][1]=path[i][1]
+    obj.faces=[range(n)]
+    meshstack.append(obj)
 
 global bezier
-def bezier(src,n): # TODO
+def bezier(src,n):
     dst=[]
     for i in range(n):
         fact0=1.0*i/(n-1)
@@ -214,7 +219,7 @@ def bezier(src,n): # TODO
     return dst
 
 global bezier_surface_sub
-def bezier_surface_sub(pts,x,y): # TODO
+def bezier_surface_sub(pts,x,y):
     n=len(pts)
     sumx=0
     sumy=0
@@ -238,14 +243,15 @@ def bezier_surface_sub(pts,x,y): # TODO
 
 global bezier_surface
 def bezier_surface(pts,n=5,zmin=-1):
+    obj=Object2d()
     ground=0
-    vertices = np.empty([n*n+(n-1)*(n-1)+ground*(4*(n-1)+1),3],dtype=float)
+    obj.vertices = np.empty([n*n+(n-1)*(n-1)+ground*(4*(n-1)+1),3],dtype=float)
     # grosses grid
     # kleines grid
     # n-1 * 4 sockel
     # sockelmittelpunkt
 
-    faces = np.empty([(n-1)*(n-1)*4+ground*(n-1)*4*3,3],dtype=int)
+    obj.faces = np.empty([(n-1)*(n-1)*4+ground*(n-1)*4*3,3],dtype=int)
     # 4fach gridmix
     # (n-1)*4*2 mantel
     # (n-1)*4 fusspunkt
@@ -254,13 +260,13 @@ def bezier_surface(pts,n=5,zmin=-1):
     # grosses grid
     for j in range(n):
         for i in range(n):
-            vertices[vertoff+j*n+i]=bezier_surface_sub(pts,1.0*i/(n-1),1.0*j/(n-1))
+            obj.vertices[vertoff+j*n+i]=bezier_surface_sub(pts,1.0*i/(n-1),1.0*j/(n-1))
     vertoff = vertoff + n*n
 
     # kleines grid
     for j in range(n-1):
         for i in range(n-1):
-            vertices[vertoff+j*(n-1)+i]=bezier_surface_sub(pts,1.0*(i+0.5)/(n-1),1.0*(j+0.5)/(n-1))
+            obj.vertices[vertoff+j*(n-1)+i]=bezier_surface_sub(pts,1.0*(i+0.5)/(n-1),1.0*(j+0.5)/(n-1))
     vertoff=vertoff+(n-1)*(n-1)
 
     if ground == 1:
@@ -272,7 +278,7 @@ def bezier_surface(pts,n=5,zmin=-1):
             ind=i
             sockeltop.append(ind)
             sockel.append(vertoff)
-            vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+            obj.vertices[vertoff]=[obj.vertices[ind][0],obj.vertices[ind][1],zmin]
             vertoff=vertoff+1
 
         # y+
@@ -280,7 +286,7 @@ def bezier_surface(pts,n=5,zmin=-1):
             ind=n-1+i*n
             sockeltop.append(ind)
             sockel.append(vertoff)
-            vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+            obj.vertices[vertoff]=[obj.vertices[ind][0],obj.vertices[ind][1],zmin]
             vertoff=vertoff+1
 
         # x-
@@ -288,7 +294,7 @@ def bezier_surface(pts,n=5,zmin=-1):
             ind=n*n-1-i
             sockeltop.append(ind)
             sockel.append(vertoff)
-            vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+            obj.vertices[vertoff]=[obj.vertices[ind][0],obj.vertices[ind][1],zmin]
             vertoff=vertoff+1
 
         # y-
@@ -296,29 +302,29 @@ def bezier_surface(pts,n=5,zmin=-1):
             ind=n*(n-1)-i*n
             sockeltop.append(ind)
             sockel.append(vertoff)
-            vertices[vertoff]=[vertices[ind][0],vertices[ind][1],zmin]
+            obj.vertices[vertoff]=[obj.vertices[ind][0],obj.vertices[ind][1],zmin]
             vertoff=vertoff+1
 
         pt=bezier_surface_sub(pts,0.5,0.5)
-        vertices[vertoff]=[pt[0],pt[1],zmin]
+        obj.vertices[vertoff]=[pt[0],pt[1],zmin]
         ci=vertoff
 
     # dreiecke
     faceoffset=0
     for j in range(n-1):
         for i in range(n-1):
-            faces[4*(j*(n-1)+i)+0][0]=j*n+i
-            faces[4*(j*(n-1)+i)+0][1]=j*n+i+1
-            faces[4*(j*(n-1)+i)+0][2]=n*n+j*(n-1)+i
-            faces[4*(j*(n-1)+i)+1][0]=j*n+i+1
-            faces[4*(j*(n-1)+i)+1][1]=j*n+i+1+n
-            faces[4*(j*(n-1)+i)+1][2]=n*n+j*(n-1)+i
-            faces[4*(j*(n-1)+i)+2][0]=j*n+i+1+n
-            faces[4*(j*(n-1)+i)+2][1]=j*n+i+n
-            faces[4*(j*(n-1)+i)+2][2]=n*n+j*(n-1)+i
-            faces[4*(j*(n-1)+i)+3][0]=j*n+i+n
-            faces[4*(j*(n-1)+i)+3][1]=j*n+i
-            faces[4*(j*(n-1)+i)+3][2]=n*n+j*(n-1)+i
+            obj.faces[4*(j*(n-1)+i)+0][0]=j*n+i
+            obj.faces[4*(j*(n-1)+i)+0][1]=j*n+i+1
+            obj.faces[4*(j*(n-1)+i)+0][2]=n*n+j*(n-1)+i
+            obj.faces[4*(j*(n-1)+i)+1][0]=j*n+i+1
+            obj.faces[4*(j*(n-1)+i)+1][1]=j*n+i+1+n
+            obj.faces[4*(j*(n-1)+i)+1][2]=n*n+j*(n-1)+i
+            obj.faces[4*(j*(n-1)+i)+2][0]=j*n+i+1+n
+            obj.faces[4*(j*(n-1)+i)+2][1]=j*n+i+n
+            obj.faces[4*(j*(n-1)+i)+2][2]=n*n+j*(n-1)+i
+            obj.faces[4*(j*(n-1)+i)+3][0]=j*n+i+n
+            obj.faces[4*(j*(n-1)+i)+3][1]=j*n+i
+            obj.faces[4*(j*(n-1)+i)+3][2]=n*n+j*(n-1)+i
 
     faceoffset=faceoffset+4*(n-1)*(n-1)
 
@@ -326,15 +332,15 @@ def bezier_surface(pts,n=5,zmin=-1):
         # sockel verzippen
         l=len(sockel)
         for i in range(len(sockel)):
-            faces[faceoffset]=[sockel[i],sockel[(i+1)%l],sockeltop[(i+1)%l]]
+            obj.faces[faceoffset]=[sockel[i],sockel[(i+1)%l],sockeltop[(i+1)%l]]
             faceoffset=faceoffset+1
-            faces[faceoffset]=[sockel[i],sockeltop[(i+1)%l],sockeltop[i]]
-            faceoffset=faceoffset+1
-
-            faces[faceoffset]=[sockel[(i+1)%l],sockel[i],ci]
+            obj.faces[faceoffset]=[sockel[i],sockeltop[(i+1)%l],sockeltop[i]]
             faceoffset=faceoffset+1
 
-    meshstack.append(CSG.form_mesh(vertices,faces)) # TODO fix
+            obj.faces[faceoffset]=[sockel[(i+1)%l],sockel[i],ci]
+            faceoffset=faceoffset+1
+
+    meshstack.append(obj)
 
 global cube
 def cube(dim=[1,1,1]):
@@ -357,7 +363,7 @@ def cone(h=1,r=1,n=16):
     obj = CSG.cone(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
     meshstack.append(obj)
 
-#global import_obj
+#global import_obj # TODO stl
 #def import_obj(filename):
 #    obj=CSG.load_mesh(filename)
 #    meshstack.append(obj)
@@ -692,24 +698,27 @@ def scale(s):
         message("No Object to scale")
         return
     obj=meshstack.pop()
-    dim=len(obj.vertices[0])
-    vertices = np.empty([len(obj.vertices),dim],dtype=float)
+    if isinstance(obj,Object2d):
+        dim=2
+    else:
+        dim=3
     if dim == 3:
         if type(s) is not list:
             s = [s,s,s]
 
-        for i in range(len(obj.vertices)):
-            vertices[i][0]=obj.vertices[i][0]*s[0]
-            vertices[i][1]=obj.vertices[i][1]*s[1]
-            vertices[i][2]=obj.vertices[i][2]*s[2]
-        meshstack.append(CSG.form_mesh(vertices,obj.faces)) # TODO fix
+        for polygon in obj.polygons:
+            for vert in polygon.vertices:
+                vert.pos.x *= s[0]
+                vert.pos.y *= s[1]
+                vert.pos.z *= s[2]
+        meshstack.append(obj)
     elif dim == 2:
         if type(s) is not list:
             s = [s,s]
         for i in range(len(obj.vertices)):
             vertices[i][0]=obj.vertices[i][0]*s[0]
             vertices[i][1]=obj.vertices[i][1]*s[1]
-        meshstack.append(pymesh.form_mesh(vertices,obj.faces)) # TODO fix
+        meshstack.append(obj)
     else:
         message("Dimension %d not supported"%(dim))
 
@@ -729,22 +738,23 @@ def mirror(v):
         message("No Object to mirror")
         return
     obj=meshstack.pop()
-    vertices = np.empty([len(obj.vertices),3],dtype=float)
-    faces = np.empty([len(obj.faces),3],dtype=int)
     l=v[0]*v[0]+v[1]*v[1]+v[2]*v[2]
-    for i in range(len(obj.vertices)):
-        pt=obj.vertices[i]
-        # find distance from pt to plane therough [0/0/0],v
-        d=pt[0]*v[0]+pt[1]*v[1]+pt[2]*v[2]
+    print(l)
+    newpolys=[]
+    for poly in obj.polygons:
+        vertices=[]
+        for pt in poly.vertices:
+            # find distance from pt to plane therough [0/0/0],v
+            d=pt.pos.x*v[0]+pt.pos.y*v[1]+pt.pos.z*v[2]
 
-        vertices[i][0]=obj.vertices[i][0] -2*d*v[0]/l
-        vertices[i][1]=obj.vertices[i][1] -2*d*v[1]/l
-        vertices[i][2]=obj.vertices[i][2] -2*d*v[2]/l
-    for i in range(len(obj.faces)):
-        faces[i][0]=obj.faces[i][0]
-        faces[i][1]=obj.faces[i][2]
-        faces[i][2]=obj.faces[i][1]
-    meshstack.append(pymesh.form_mesh(vertices,faces)) # TODO fix
+            newx = pt.pos.x -2*d*v[0]/l
+            newy = pt.pos.y -2*d*v[1]/l
+            newz = pt.pos.z -2*d*v[2]/l
+            vertices.insert(0,Vertex(Vector(newx,newy,newz)))
+        newpolys.append(Polygon(vertices))
+    obj.polygons=newpolys
+
+    meshstack.append(obj)
 
 
 global CutPlaneStraight
