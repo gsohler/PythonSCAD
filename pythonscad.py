@@ -1,8 +1,5 @@
 #! /usr/bin/python3
 
-# TODO alle funktionen cache for speedup
-# TODO funktion zum Unterscheiden 2d/3d
-
 # TODO rotate_extrude linear_extrude mehr freiheitsgrade
 # TODO rotate_extrude_extrude anpassen
 
@@ -11,6 +8,8 @@
 # TODO extrude 2* mit wechselnden shapes
 # TODO gears
 # TODO vertices ueberall korrigieren
+# TODO selber Datenstruktor 2d/3d
+# TODO optimierteres CSG ? (shader,c, assembler)
 # TODO errors in window
 # TODO fit funktion
 
@@ -37,7 +36,6 @@ from My3DViewer import *
 def keypressevent(window, event):
     global modifiers
     keyval = event.keyval
-#    print(keyval)
 
     if keyval == Gdk.KEY_F1:
         print("F1 pressed")
@@ -49,7 +47,6 @@ def keypressevent(window, event):
     if keyval == Gdk.KEY_F6:
         export_stl(window)
     if keyval == 65505 or keyval == 65506: # TODO
-#        print("Shift presed")
         modifiers=1
         pass
 
@@ -145,7 +142,7 @@ def mesh_result():
     if viewer_obj is not None:
         return viewer_obj
     if len(meshstack) > 0:
-        if isinstance(meshstack[0],Object2d):
+        if get_dimension(meshstack[0]) == 2:
             linear_extrude(1)
         union(len(meshstack))
         return meshstack[0]
@@ -189,11 +186,16 @@ def form_mesh(vertices, faces):
         polygons.append(Polygon(newvertices))
     return CSG.fromPolygons(polygons)
 
+def get_dimension(obj):
+    if isinstance(obj,Object2d):
+        return 2
+    else: # TODO besser
+        return 3
 
 global dump
 def dump():
     obj=mesh_top()
-    if isinstance(obj, Object2d):
+    if get_dimension(obj) == 2:
         print("2D Vertices")
         for v in obj.vertices:
             print("%.2f/%.2f, "%(v[0],v[1]),end='')
@@ -792,7 +794,9 @@ global translate
 def translate(off): # Cached
 
     obj,desc=mesh_pop("translate")
-    if isinstance(obj,Object2d):
+
+    dim=get_dimension(obj)
+    if dim == 2:
         key="%s%f%ftrans"%(desc,off[0],off[1])
     else:
         key="%s%f%f%ftrans"%(desc,off[0],off[1],off[2])
@@ -800,7 +804,8 @@ def translate(off): # Cached
     if newobj is not None:
         mesh_push(newobj,key)
         return
-    if isinstance(obj,Object2d):
+
+    if dim  == 2:
         newobj=Object2d()
         newobj.vertices = np.empty([len(obj.vertices),2],dtype=float)
         newobj.faces=obj.faces
@@ -810,6 +815,7 @@ def translate(off): # Cached
     else:
         newobj = CSG.clone(obj)
         newobj.translate(off)
+
     cache_put(key,newobj)
     mesh_push(newobj,key)
 
@@ -817,27 +823,39 @@ def translate(off): # Cached
 global scale
 def scale(s):
     obj,desc=mesh_pop("scale")
-    if isinstance(obj,Object2d):
-        dim=2
+    dim=get_dimension(obj)
+    if dim == 2:
+        if type(s) is not list:
+            s = [s,s]
+        key="%s%f%fscale"%(desc,s[0],s[1])
     else:
-        dim=3
-    if dim == 3:
         if type(s) is not list:
             s = [s,s,s]
+        key="%s%f%f%fscale"%(desc,s[0],s[1],s[2])
 
-        for polygon in obj.polygons:
+    newobj=cache_find(key)
+    if newobj is not None:
+        mesh_push(newobj,key)
+        return
+
+    if dim == 3:
+        newobj = CSG.clone(obj)
+        for polygon in newobj.polygons:
             for vert in polygon.vertices:
                 vert.pos.x *= s[0]
                 vert.pos.y *= s[1]
                 vert.pos.z *= s[2]
-        mesh_push(obj,"TODO")
+        cache_put(key,newobj)
+        mesh_push(newobj,key)
     elif dim == 2:
-        if type(s) is not list:
-            s = [s,s]
-        for i in range(len(obj.vertices)):
+        newobj=Object2d()
+        newobj.vertices = np.empty([len(obj.vertices),2],dtype=float)
+        newobj.faces=obj.faces
+        for i in range(len(newobj.vertices)):
             vertices[i][0]=obj.vertices[i][0]*s[0]
             vertices[i][1]=obj.vertices[i][1]*s[1]
-        mesh_push(obj,"TODO")
+        cache_put(key,newobj)
+        mesh_push(newobj,key)
     else:
         message("Dimension %d not supported"%(dim))
 
