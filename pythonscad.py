@@ -44,7 +44,7 @@ def keypressevent(window, event):
         save_script(window)
         message( "Script saved")
     if keyval == Gdk.KEY_F5:
-        print("F5 presed")
+        print("F5 pressed")
         render(window)
     if keyval == Gdk.KEY_F6:
         export_stl(window)
@@ -147,34 +147,28 @@ def mesh_result():
     return None
 
 ####################################
+# Object Cache
+####################################
+
+mesh_cache={}
+def cache_find(key):
+    global mesh_cache
+    if key in mesh_cache:
+        print("Found %s"%(key))
+        return mesh_cache[key]
+    else:
+        return None
+
+def cache_put(key,obj):
+    global mesh_cache
+    mesh_cache[key]=obj
+
+
+
+####################################
 # Script utility functions
 ####################################
 
-
-global dump
-def dump(): 
-    obj=mesh_top
-    if isinstance(obj, Object2d):
-        print("2D Vertices")
-        for v in obj.vertices:
-            print("%.2f/%.2f, "%(v[0],v[1]),end='')
-        print("\n2D Faces")
-        for face in obj.faces:
-            print(face)
-        
-    else:
-        print("3D Polygons :")
-        for poly in obj.polygons:
-            print("(",end=' ')
-            for v in poly.vertices:
-                print("%.2f/%.2f/%.2f, "%(v.pos.x,v.pos.y,v.pos.z),end='')
-            print(")")
-
-global dup
-def dup(n=1):
-    obj=mesh_top()
-    for i in range(n):
-        mesh_push(obj.clone())
 
 class Object2d:
     def __init__(self):
@@ -191,14 +185,46 @@ def form_mesh(vertices, faces):
     return CSG.fromPolygons(polygons)
 
 
+global dump
+def dump():
+    obj=mesh_top()
+    if isinstance(obj, Object2d):
+        print("2D Vertices")
+        for v in obj.vertices:
+            print("%.2f/%.2f, "%(v[0],v[1]),end='')
+        print("\n2D Faces")
+        for face in obj.faces:
+            print(face)
+    else:
+        print("3D Polygons :")
+        for poly in obj.polygons:
+            print("(",end=' ')
+            for v in poly.vertices:
+                print("%.2f/%.2f/%.2f, "%(v.pos.x,v.pos.y,v.pos.z),end='')
+            print(")")
+
+global dup
+def dup(n=1):
+    obj=mesh_top()
+    for i in range(n):
+        mesh_push(obj.clone())
+
+
 global square
-def square(s=1):
+def square(s=1): # Cached
     if type(s) is not list:
         w=s
         l=s
     else:
         w=s[0]
         l=s[1]
+
+    key="square%f,%f"%(w,l)
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj)
+        return
+
     obj=Object2d()
     obj.vertices = np.empty([4,2],dtype=float)
     obj.vertices[0]=[0,0]
@@ -210,11 +236,18 @@ def square(s=1):
     obj.faces[0]=[0,1,2]
     obj.faces[1]=[0,2,3]
 
+    cache_put(key,obj)
 
     mesh_push(obj)
 
 global circle
-def circle(r=1,n=10):
+def circle(r=1,n=10): # Cached
+    key="circle%f,%d"%(r,n)
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj)
+        return
+
     obj=Object2d()
     obj.vertices = np.empty([n+1,2],dtype=float)
     obj.faces = np.empty([n,3],dtype=int)
@@ -225,10 +258,19 @@ def circle(r=1,n=10):
         ]
         obj.faces[i]=[i,(i+1)%n,n]
     obj.vertices[n]=[0,0]
+    cache_put(key,obj)
     mesh_push(obj)
 
 global polygon
-def polygon(path):
+def polygon(path): # Cached
+    key="polygon"
+    for pt in path:
+        key=key+"%f,%f"%(pt[0],pt[1])
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj)
+        return
+
     n = len(path);
     obj=Object2d()
     obj.vertices = np.empty([n,2],dtype=float)
@@ -236,6 +278,7 @@ def polygon(path):
         obj.vertices[i][0]=path[i][0]
         obj.vertices[i][1]=path[i][1]
     obj.faces=[range(n)]
+    cache_put(key,obj)
     mesh_push(obj)
 
 global bezier
@@ -380,24 +423,49 @@ def bezier_surface(pts,n=5,zmin=-1):
     mesh_push(obj)
 
 global cube
-def cube(dim=[1,1,1]):
+def cube(dim=[1,1,1]): # Cached
+    key="cube%f,%f,%f"%(dim[0],dim[1],dim[2])
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj)
+        return
     half=[dim[0]/2.0,dim[1]/2.0,dim[2]/2.0]
     obj=CSG.cube(center=half,radius=half)
+    cache_put(key,obj)
     mesh_push(obj)
 
+
 global sphere
-def sphere(r=1,center=[0,0,0],n=2):
+def sphere(r=1,center=[0,0,0]): # Cached
+    key="sphere%f,%f,%f,%f,%d"%(r,center[0],center[1],center[2])
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj)
+        return
     obj=CSG.sphere(center=center,radius=r)
+    cache_put(key,obj)
     mesh_push(obj)
 
 global cylinder
-def cylinder(h=1,r=1,n=16):
+def cylinder(h=1,r=1,n=16): # Cached
+    key="cylinder%f,%f%d"%(r,h,n)
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj)
+        return
     obj = CSG.cylinder(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
+    cache_put(key,obj)
     mesh_push(obj)
 
 global cone
-def cone(h=1,r=1,n=16):
+def cone(h=1,r=1,n=16): # Cached
+    key="cone%f,%f%d"%(r,h,n)
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj)
+        return
     obj = CSG.cone(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
+    cache_put(key,obj)
     mesh_push(obj)
 
 #global import_obj # TODO stl
@@ -580,13 +648,18 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
 
 global linear_extrude
 def linear_extrude(height=1,n=2,func=None):
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     if func is None:
         obj=mesh_pop("linear_extrude")
         nv=len(obj.vertices)
         profile=triangle_combine(obj.faces)
     else:
         vertices = None
-    
+
     profiles = []
     layers=n
     conns=layers-1
@@ -625,6 +698,11 @@ def linear_extrude(height=1,n=2,func=None):
 global rotate_extrude
 def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     layers=n+1
     conns=n
     closed=1
@@ -705,14 +783,23 @@ def ang_convert(span,steps):
 global translate
 def translate(off):
 
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     obj=mesh_pop("translate")
     if isinstance(obj,Object2d):
-        for vert in obj.vertices:
-            vert[0] = vert[0] + off[0]
-            vert[1] = vert[1] + off[1]
+        newobj=Object2d()
+        newobj.vertices = np.empty([len(obj.vertices),2],dtype=float)
+        newobj.faces=obj.faces
+        for i in range(len(obj.vertices)):
+            newobj.vertices[i][0] = obj.vertices[i][0] + off[0]
+            newobj.vertices[i][1] = obj.vertices[i][1] + off[1]
     else:
-        obj.translate(off)
-    mesh_push(obj)
+        newobj = obj.clone()
+        newobj.translate(off)
+    mesh_push(newobj)
 
 
 global scale
@@ -744,6 +831,11 @@ def scale(s):
 
 global rotate
 def rotate(axis,rot):
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     obj=mesh_pop("rotate")
     obj.rotate(axis,rot)
     mesh_push(obj)
@@ -751,6 +843,11 @@ def rotate(axis,rot):
 
 global mirror
 def mirror(v):
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     obj=mesh_pop("mirror")
     l=v[0]*v[0]+v[1]*v[1]+v[2]*v[2]
     print(l)
@@ -876,30 +973,55 @@ def size(s=1.0):
 
 global top
 def top():
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     cube([2000,2000,1000])
     translate([-1000,-1000,0])
     intersection()
 
 global bottom
 def bottom():
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     cube([2000,2000,1000])
     translate([-1000,-1000,-1000])
     intersection()
 
 global right
 def right():
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     cube([1000,2000,2000])
     translate([0,-1000,-1000])
     intersection()
 
 global left
 def left():
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     cube([1000,2000,2000])
     translate([-1000,-1000,-1000])
     intersection()
 
 global front
 def front():
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     cube([2000,1000,2000])
     translate([-1000,0,-1000])
     intersection()
@@ -907,6 +1029,11 @@ def front():
 
 global back
 def back():
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     cube([2000,1000,2000])
     translate([-1000,-1000,-1000])
     intersection()
@@ -929,12 +1056,22 @@ def show(obj):
 
 global difference
 def difference():
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     obj2=mesh_pop("difference")
     obj1=mesh_pop("difference")
     mesh_push(obj1.subtract(obj2))
 
 global union
 def union(n=2):
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     if n == 1:
         return
     obj1=mesh_pop("union")
@@ -991,6 +1128,11 @@ def union(n=2):
 
 global intersection
 def intersection(n=2):
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     if n == 1:
         return
     obj1=mesh_pop("intersection")
@@ -1002,6 +1144,11 @@ def intersection(n=2):
 
 global volume
 def volume(): # TODO fix function
+#    key="circle%f,%d"%(r,n)
+#    obj=cache_find(key)
+#    if obj is not None:
+#        mesh_push(obj)
+#        return
     volume=0
     obj=mesh_pop("Volume")
     dim=len(obj.vertices[0])
