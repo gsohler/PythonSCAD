@@ -1,20 +1,19 @@
 #! /usr/bin/python3
 
-# TODO achsen immer gleich hell
-# TODO profile verschieden viele segmente
+# TODO alle funktionen cache for speedup
+# TODO funktion zum Unterscheiden 2d/3d
+
 # TODO rotate_extrude linear_extrude mehr freiheitsgrade
-# TODO goal funktion
-# TODO rezept, start verschachtelung
-# TODO optimizer
 # TODO rotate_extrude_extrude anpassen
 
 # TODO editor syntax highlighting
-# TODO GTK3
 # TODO Sample thingiverse publication
 # TODO extrude 2* mit wechselnden shapes
 # TODO gears
-# TODO cache for speedup
 # TODO vertices ueberall korrigieren
+# TODO errors in window
+# TODO fit funktion
+
 
 import math
 import argparse
@@ -31,7 +30,6 @@ from csg.geom import Vertex, Vector, Polygon
 
 from My3DViewer import *
 
-listind = -1
 ####################################
 # Viewer
 ####################################
@@ -78,7 +76,7 @@ def message(str):
 class MyTextView(Gtk.TextView):
     def __init__(self):
         Gtk.TextView.__init__(self)
-#        self.set_border_window_size(Gtk.TEXT_WINDOW_LEFT, 24)
+#        self.set_border_window_size(Gtk.TEXT_WINDOW_LEFT, 24) TODO activate
 #        self.connect("expose-event", on_text_view_expose_event)
 
 def on_text_view_expose_event(text_view, event):
@@ -104,16 +102,58 @@ def on_text_view_expose_event(text_view, event):
         y=y,
         layout=layout)
 
+####################################
+# Meshstack
+####################################
+
+meshstack = [] # TODO ueberall verwenden
+def mesh_init():
+    global meshstack
+    meshstack = []
+
+def mesh_push(obj):
+    global meshstack
+    meshstack.append(obj)
+
+def mesh_pop(purpose=None):
+    global meshstack
+    if len(meshstack) == 0:
+        if purpose is not None:
+            message("No Items on Stack")
+        else:
+            message("No Items on Stack for %s"%(purpose))
+        return None
+    return meshstack.pop()
+
+def mesh_top(purpose=None):
+    global meshstack
+    if len(meshstack) == 0:
+        if purpose is not None:
+            message("No Items on Stack")
+        else:
+            message("No Items on Stack for %s"%(purpose))
+        return None
+    return meshstack[-1]
+
+def mesh_result():
+    global viewer_obj
+    if viewer_obj is not None:
+        return viewer_obj
+    if len(meshstack) > 0:
+        if isinstance(meshstack[0],Object2d):
+            linear_extrude(1)
+        union(len(meshstack))
+        return meshstack[0]
+    return None
 
 ####################################
 # Script utility functions
 ####################################
 
-meshstack = []
 
 global dump
 def dump(): 
-    obj=meshstack[-1]
+    obj=mesh_top
     if isinstance(obj, Object2d):
         print("2D Vertices")
         for v in obj.vertices:
@@ -132,12 +172,9 @@ def dump():
 
 global dup
 def dup(n=1):
-    if len(meshstack) == 0:
-        message("No Object to dup")
-        return
-    obj=meshstack[-1]
+    obj=mesh_top()
     for i in range(n):
-        meshstack.append(obj.clone())
+        mesh_push(obj.clone())
 
 class Object2d:
     def __init__(self):
@@ -174,7 +211,7 @@ def square(s=1):
     obj.faces[1]=[0,2,3]
 
 
-    meshstack.append(obj)
+    mesh_push(obj)
 
 global circle
 def circle(r=1,n=10):
@@ -188,7 +225,7 @@ def circle(r=1,n=10):
         ]
         obj.faces[i]=[i,(i+1)%n,n]
     obj.vertices[n]=[0,0]
-    meshstack.append(obj)
+    mesh_push(obj)
 
 global polygon
 def polygon(path):
@@ -199,7 +236,7 @@ def polygon(path):
         obj.vertices[i][0]=path[i][0]
         obj.vertices[i][1]=path[i][1]
     obj.faces=[range(n)]
-    meshstack.append(obj)
+    mesh_push(obj)
 
 global bezier
 def bezier(src,n):
@@ -340,33 +377,33 @@ def bezier_surface(pts,n=5,zmin=-1):
             obj.faces[faceoffset]=[sockel[(i+1)%l],sockel[i],ci]
             faceoffset=faceoffset+1
 
-    meshstack.append(obj)
+    mesh_push(obj)
 
 global cube
 def cube(dim=[1,1,1]):
     half=[dim[0]/2.0,dim[1]/2.0,dim[2]/2.0]
     obj=CSG.cube(center=half,radius=half)
-    meshstack.append(obj)
+    mesh_push(obj)
 
 global sphere
 def sphere(r=1,center=[0,0,0],n=2):
     obj=CSG.sphere(center=center,radius=r)
-    meshstack.append(obj)
+    mesh_push(obj)
 
 global cylinder
 def cylinder(h=1,r=1,n=16):
     obj = CSG.cylinder(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
-    meshstack.append(obj)
+    mesh_push(obj)
 
 global cone
 def cone(h=1,r=1,n=16):
     obj = CSG.cone(start=[0,0,0],end=[0,0,h],slices=n,radius=r)
-    meshstack.append(obj)
+    mesh_push(obj)
 
 #global import_obj # TODO stl
 #def import_obj(filename):
 #    obj=CSG.load_mesh(filename)
-#    meshstack.append(obj)
+#    mesh_push(obj)
 
 
 ####
@@ -538,16 +575,13 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
                     i2=i2+1
 
 
-    meshstack.append(form_mesh(vertices,faces))
+    mesh_push(form_mesh(vertices,faces))
 
 
 global linear_extrude
 def linear_extrude(height=1,n=2,func=None):
     if func is None:
-        if len(meshstack) == 0:
-            message("No Object to extrude")
-            return
-        obj=meshstack.pop()
+        obj=mesh_pop("linear_extrude")
         nv=len(obj.vertices)
         profile=triangle_combine(obj.faces)
     else:
@@ -565,10 +599,7 @@ def linear_extrude(height=1,n=2,func=None):
     for j in range(layers):
         if func is not None:
             func(j)
-            if len(meshstack) == 0:
-                message("No Object to extrude")
-                return
-            obj=meshstack.pop()
+            obj=mesh_popp("extrude")
             if vertices is None:
                 nv=len(obj.vertices)
                 vertices = np.empty([layers*nv,3],dtype=float)
@@ -600,10 +631,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 
     profiles = []
     if func is None:
-        if len(meshstack) == 0:
-            message("No Object to extrude")
-            return
-        obj=meshstack.pop()
+        obj=mesh_pop("extrude")
         nv=len(obj.vertices)
         vertices = np.empty([layers*nv,3],dtype=float)
         profile=triangle_combine(obj.faces)
@@ -623,10 +651,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
     for j in range(layers):
         if func is not None:
             func(j)
-            if len(meshstack) == 0:
-                message("No Object to extrude")
-                return
-            obj=meshstack.pop()
+            obj=mesh_pop("extrude")
             if vertices is None:
                 nv=len(obj.vertices)
                 vertices = np.empty([layers*nv,3],dtype=float)
@@ -651,11 +676,8 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 
 global ang_convert
 def ang_convert(span,steps):
-    if len(meshstack) == 0:
-        message("No Object to convert")
-        return
 
-    obj=meshstack.pop()
+    obj=mesh_pop("ang_convert")
     #TODO Sliceing an object is overkill, just add more points
     result=None
     step=1.0*span/steps
@@ -675,7 +697,7 @@ def ang_convert(span,steps):
             result = tmp
         else:
             result =CSG.boolean(result,tmp,"union") # TODO fix
-        meshstack.append(result)
+        mesh_push(result)
 
 
 ####
@@ -683,26 +705,19 @@ def ang_convert(span,steps):
 global translate
 def translate(off):
 
-    if len(meshstack) == 0:
-        message("No Object to translate")
-        return
-
-    obj=meshstack.pop()
+    obj=mesh_pop("translate")
     if isinstance(obj,Object2d):
         for vert in obj.vertices:
             vert[0] = vert[0] + off[0]
             vert[1] = vert[1] + off[1]
     else:
         obj.translate(off)
-    meshstack.append(obj)
+    mesh_push(obj)
 
 
 global scale
 def scale(s):
-    if len(meshstack) == 0:
-        message("No Object to scale")
-        return
-    obj=meshstack.pop()
+    obj=mesh_pop("scale")
     if isinstance(obj,Object2d):
         dim=2
     else:
@@ -716,33 +731,27 @@ def scale(s):
                 vert.pos.x *= s[0]
                 vert.pos.y *= s[1]
                 vert.pos.z *= s[2]
-        meshstack.append(obj)
+        mesh_push(obj)
     elif dim == 2:
         if type(s) is not list:
             s = [s,s]
         for i in range(len(obj.vertices)):
             vertices[i][0]=obj.vertices[i][0]*s[0]
             vertices[i][1]=obj.vertices[i][1]*s[1]
-        meshstack.append(obj)
+        mesh_push(obj)
     else:
         message("Dimension %d not supported"%(dim))
 
 global rotate
 def rotate(axis,rot):
-    if len(meshstack) == 0:
-        message("No Object to rotate")
-        return
-    obj=meshstack.pop()
+    obj=mesh_pop("rotate")
     obj.rotate(axis,rot)
-    meshstack.append(obj)
+    mesh_push(obj)
 
 
 global mirror
 def mirror(v):
-    if len(meshstack) == 0:
-        message("No Object to mirror")
-        return
-    obj=meshstack.pop()
+    obj=mesh_pop("mirror")
     l=v[0]*v[0]+v[1]*v[1]+v[2]*v[2]
     print(l)
     newpolys=[]
@@ -759,7 +768,7 @@ def mirror(v):
         newpolys.append(Polygon(vertices))
     obj.polygons=newpolys
 
-    meshstack.append(obj)
+    mesh_push(obj)
 
 
 global CutPlaneStraight
@@ -787,10 +796,7 @@ def CutPlanePlane(p1,n1, p2,n2): # return list(pos, dir)
 
 global size
 def size(s=1.0):
-    if len(meshstack) == 0:
-        message("No Object to size")
-        return
-    obj=meshstack.pop()
+    obj=mesh_pop("size")
 
     obj=pymesh.resolve_self_intersection(obj) # TODO fix
 
@@ -864,7 +870,7 @@ def size(s=1.0):
     obj=pymesh.resolve_self_intersection(obj) # TODO fix
 # pymesh.nerge_meshes # TODO fix
     obj=pymesh.form_mesh(vertices,obj.faces) # TODO fix
-    meshstack.append(obj)
+    mesh_push(obj)
 
 
 
@@ -907,11 +913,11 @@ def back():
 
 global pop
 def pop():
-    return meshstack.pop()
+    return mesh_pop("pop")
 
 global push
 def push(x):
-    meshstack.append(x.clone())
+    mesh_push(x.clone())
 
 viewer_obj = None
 global show
@@ -923,25 +929,19 @@ def show(obj):
 
 global difference
 def difference():
-    if len(meshstack) < 2:
-        message("Too less Objects for Difference")
-        return
-    obj2=meshstack.pop()
-    obj1=meshstack.pop()
-    meshstack.append(obj1.subtract(obj2))
+    obj2=mesh_pop("difference")
+    obj1=mesh_pop("difference")
+    mesh_push(obj1.subtract(obj2))
 
 global union
 def union(n=2):
     if n == 1:
         return
-    if len(meshstack) < n:
-        message("Too less Objects for Union")
-        return
-    obj1=meshstack.pop()
+    obj1=mesh_pop("union")
     for i in range(n-1):
-        obj2=meshstack.pop()
+        obj2=mesh_pop("union")
         obj1 =obj1.union(obj2)
-    meshstack.append(obj1)
+    mesh_push(obj1)
 
 #global concat
 #def concat(n=2):
@@ -955,7 +955,7 @@ def union(n=2):
 #    vertlen=0
 #    facelen=0
 #    for i in range(n):
-#        obj=meshstack.pop()
+#        obj=mesh_pop("concat")
 #        vertlen += len(obj.vertices)
 #        facelen += len(obj.faces)
 #        objs.append(obj)
@@ -980,40 +980,30 @@ def union(n=2):
 #        vertoff = vertoff + len(obj.vertices)
 #        faceoff = faceoff + len(obj.faces)
 #    obj=pymesh.form_mesh(vertices,faces) # TODO fix
-#    meshstack.append(obj)
+#    mesh_push(obj)
 
 
 #global hull
 #def hull():
-#    if len(meshstack) == 0:
-#        message("No Object to hull")
-#        return
-#
-#    obj=meshstack.pop()
+#    obj=mesh_pop("hull")
 #    obj=pymesh.convex_hull(obj) # TODO fix
-#    meshstack.append(obj)
+#    mesh_push(obj)
 
 global intersection
 def intersection(n=2):
     if n == 1:
         return
-    if len(meshstack) < n:
-        message("Too less Objects for Intersection")
-        return
-    obj1=meshstack.pop()
+    obj1=mesh_pop("intersection")
     for i in range(n-1):
-        obj2=meshstack.pop()
+        obj2=mesh_pop("intersection")
         obj1 =obj1.intersect(obj2)
-    meshstack.append(obj1)
+    mesh_push(obj1)
 
 
 global volume
-def volume():
+def volume(): # TODO fix function
     volume=0
-    if len(meshstack) == 0:
-        message("No Object to calculate")
-        return
-    obj=meshstack.pop()
+    obj=mesh_pop("Volume")
     dim=len(obj.vertices[0])
     if  dim == 2:
         for tri in obj.faces:
@@ -1040,24 +1030,10 @@ def volume():
 # Top
 ####################################
 
-def get_result(): # TODO verbessern
-    global viewer_obj
-    if viewer_obj is not None:
-        return viewer_obj
-    if len(meshstack) > 0:
-        if isinstance(meshstack[0],Object2d):
-            linear_extrude(1)
-        union(len(meshstack))
-        return meshstack[0]
-    return None
-
-
-
 
 
 def render(window):
-    global meshstack
-    meshstack = []
+    mesh_init()
     viewer_obj=None
 
     try:
@@ -1069,7 +1045,7 @@ def render(window):
         traceback.print_exc()
         return
 
-    mesh = get_result()
+    mesh = mesh_result()
 
     if mesh is None:
         message( "Error: No Objects generated")
@@ -1132,9 +1108,6 @@ def export_stl_cb(mesh,filename):
                 f.write(struct.pack('<bb',0,0))
 
 def export_stl(window):
-    if len(meshstack) == 0:
-        message( "Error: No Objects generated")
-        return
     mesh = get_result()
     text_filter=Gtk.FileFilter()
     text_filter.set_name("Text files")
@@ -1164,6 +1137,8 @@ parser.add_argument("file", help="Graphics  File")
 parser.add_argument("-s", "--scale", help="Scale(1.0)",default=1.0)
 args = parser.parse_args()
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+# TODO kein parameter moeglich
+# TODO stl file load
 
 separateWindow=True
 
