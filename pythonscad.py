@@ -224,7 +224,7 @@ def square(s=1): # Cached
         w=s[0]
         l=s[1]
 
-    key="f,%fsquare"%(w,l)
+    key="%f,%fsquare"%(w,l)
     obj=cache_find(key)
     if obj is not None:
         mesh_push(obj,key)
@@ -574,7 +574,7 @@ def extrude_finish_link(vertices,faces,p1x,p2x,faceoff,off):
         i2=i2+1
 
 
-def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
+def extrude_finish(obj,layers,conns,vertices,profile,key,endcap=1):
     nf=len(obj.faces)
     nv=len(obj.vertices)
     nd=len(obj.faces[0]) # points per face
@@ -649,18 +649,20 @@ def extrude_finish(obj,layers,conns,vertices,profile,endcap=1):
                     i2=i2+1
 
 
-    mesh_push(form_mesh(vertices,faces),"TODO")
+    obj=form_mesh(vertices,faces)
+    cache_put(key,obj)
+    mesh_push(obj,key)
 
 
 global linear_extrude
-def linear_extrude(height=1,n=2,func=None):
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
+def linear_extrude(height=1,n=2,func=None): # Cached TODO for no func
     if func is None:
         obj,desc=mesh_pop("linear_extrude")
+        key="%s%f%dlinextrude"%(desc,height,n)
+        newobj=cache_find(key)
+        if newobj is not None:
+            mesh_push(newobj,key)
+            return
         nv=len(obj.vertices)
         profile=triangle_combine(obj.faces)
     else:
@@ -699,16 +701,11 @@ def linear_extrude(height=1,n=2,func=None):
         profiles.append(tmp_profile)
         vertice_off = vertice_off+nv
 
-    extrude_finish(obj,layers,conns,vertices,profiles,1)
+    extrude_finish(obj,layers,conns,vertices,profiles,key,1)
 
 global rotate_extrude
 def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
 
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     layers=n+1
     conns=n
     closed=1
@@ -716,6 +713,11 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
     profiles = []
     if func is None:
         obj,desc=mesh_pop("extrude")
+        key="%s%d%f%f%frotext"%(desc,n,a1,a2,elevation)
+        newobj=cache_find(key)
+        if newobj is not None:
+            mesh_push(newobj,key)
+            return
         nv=len(obj.vertices)
         vertices = np.empty([layers*nv,3],dtype=float)
         profile=triangle_combine(obj.faces)
@@ -756,7 +758,7 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
             tmp_profile.append(newsubprof)
         profiles.append(tmp_profile)
         vertice_off = vertice_off+nv
-    extrude_finish(obj,layers,conns,vertices,profiles,closed)
+    extrude_finish(obj,layers,conns,vertices,profiles,key,closed)
 
 global ang_convert
 def ang_convert(span,steps):
@@ -787,14 +789,17 @@ def ang_convert(span,steps):
 ####
 
 global translate
-def translate(off):
+def translate(off): # Cached
 
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     obj,desc=mesh_pop("translate")
+    if isinstance(obj,Object2d):
+        key="%s%f%ftrans"%(desc,off[0],off[1])
+    else:
+        key="%s%f%f%ftrans"%(desc,off[0],off[1],off[2])
+    newobj=cache_find(key)
+    if newobj is not None:
+        mesh_push(newobj,key)
+        return
     if isinstance(obj,Object2d):
         newobj=Object2d()
         newobj.vertices = np.empty([len(obj.vertices),2],dtype=float)
@@ -803,9 +808,10 @@ def translate(off):
             newobj.vertices[i][0] = obj.vertices[i][0] + off[0]
             newobj.vertices[i][1] = obj.vertices[i][1] + off[1]
     else:
-        newobj = obj.clone()
+        newobj = CSG.clone(obj)
         newobj.translate(off)
-    mesh_push(newobj,"TODO")
+    cache_put(key,newobj)
+    mesh_push(newobj,key)
 
 
 global scale
@@ -836,25 +842,26 @@ def scale(s):
         message("Dimension %d not supported"%(dim))
 
 global rotate
-def rotate(axis,rot):
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
+def rotate(axis,rot): # Cached
     obj,desc=mesh_pop("rotate")
+    key="%s%f,%f,%f,%frot"%(desc,axis[0],axis[1],axis[2],rot)
+    newobj=cache_find(key)
+    if newobj is not None:
+        mesh_push(newobj,key)
+        return
     obj.rotate(axis,rot)
-    mesh_push(obj,"TODO")
+    cache_put(key,obj)
+    mesh_push(obj,key)
 
 
 global mirror
-def mirror(v):
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
+def mirror(v): # Cached
     obj,desc=mesh_pop("mirror")
+    key="%s%f%f%fmirror"%(desc,v[0],v[1],v[2])
+    newobj=cache_find(key)
+    if newobj is not None:
+        mesh_push(newobj,key)
+        return
     l=v[0]*v[0]+v[1]*v[1]+v[2]*v[2]
     print(l)
     newpolys=[]
@@ -871,8 +878,8 @@ def mirror(v):
         newpolys.append(Polygon(vertices))
     obj.polygons=newpolys
 
-    mesh_push(obj,"TODO")
-
+    mesh_push(obj,key)
+    cache_put(key,obj)
 
 global CutPlaneStraight
 def CutPlaneStraight(plpos,pldir,s,sd): # Flaeche mit Gerade  s, s-dir schneiden: punkt
@@ -979,55 +986,30 @@ def size(s=1.0):
 
 global top
 def top():
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     cube([2000,2000,1000])
     translate([-1000,-1000,0])
     intersection()
 
 global bottom
 def bottom():
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     cube([2000,2000,1000])
     translate([-1000,-1000,-1000])
     intersection()
 
 global right
 def right():
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     cube([1000,2000,2000])
     translate([0,-1000,-1000])
     intersection()
 
 global left
 def left():
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     cube([1000,2000,2000])
     translate([-1000,-1000,-1000])
     intersection()
 
 global front
 def front():
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     cube([2000,1000,2000])
     translate([-1000,0,-1000])
     intersection()
@@ -1035,11 +1017,6 @@ def front():
 
 global back
 def back():
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj,"TODO")
-#        return
     cube([2000,1000,2000])
     translate([-1000,-1000,-1000])
     intersection()
@@ -1060,7 +1037,7 @@ def show(obj):
 
 ####
 
-global difference
+global difference # Cached TODO many args
 def difference():
     obj2,desc2=mesh_pop("difference")
     obj1,desc1=mesh_pop("difference")
@@ -1074,20 +1051,27 @@ def difference():
     cache_put(key,obj)
     mesh_push(obj,key)
 
-global union
+global union # Cached
 def union(n=2):
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj)
-#        return
-    if n == 1:
+    key=""
+    stk=[]
+
+    for i in range(n):
+        obj,desc=mesh_pop("union")
+        stk.append(obj)
+        key=key+desc
+    key=key+"union"
+
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj,key)
         return
-    obj1,desc1=mesh_pop("union")
+
+    obj=stk.pop()
     for i in range(n-1):
-        obj2,desc2=mesh_pop("union")
-        obj1 =obj1.union(obj2)
-    mesh_push(obj1)
+        obj =obj.union(stk.pop())
+    cache_put(key,obj)
+    mesh_push(obj,key)
 
 #global concat
 #def concat(n=2):
@@ -1135,20 +1119,27 @@ def union(n=2):
 #    obj=pymesh.convex_hull(obj) # TODO fix
 #    mesh_push(obj)
 
-global intersection
-def intersection(n=2):
-#    key="circle%f,%d"%(r,n)
-#    obj=cache_find(key)
-#    if obj is not None:
-#        mesh_push(obj)
-#        return
-    if n == 1:
+global intersection 
+def intersection(n=2): # Cached
+    key=""
+    stk=[]
+
+    for i in range(n):
+        obj,desc=mesh_pop("intersection")
+        stk.append(obj)
+        key=key+desc
+    key=key+"intersection"
+
+    obj=cache_find(key)
+    if obj is not None:
+        mesh_push(obj,key)
         return
-    obj1,desc1=mesh_pop("intersection")
+
+    obj=stk.pop()
     for i in range(n-1):
-        obj2,desc2=mesh_pop("intersection")
-        obj1 =obj1.intersect(obj2)
-    mesh_push(obj1)
+        obj =obj.intersect(stk.pop())
+    cache_put(key,obj)
+    mesh_push(obj,key)
 
 
 global volume
