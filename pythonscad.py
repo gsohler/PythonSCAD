@@ -143,7 +143,7 @@ def mesh_top(purpose=None):
 def mesh_result():
     global viewer_obj
     if viewer_obj is not None:
-        return viewer_obj
+        return viewer_obj[0]
     if len(meshstack) > 0:
         if isinstance(meshstack[0],Object2d):
             linear_extrude(1)
@@ -1023,11 +1023,12 @@ def back():
 
 global pop
 def pop():
-    return mesh_pop("pop")
+    mesh,desc=mesh_pop("pop")
+    return [mesh,desc]
 
 global push
 def push(x):
-    mesh_push(x)
+    mesh_push(x[0],x[1])
 
 viewer_obj = None
 global show
@@ -1188,8 +1189,10 @@ def render(window):
         script = buffer.get_text(buffer.get_start_iter(),buffer.get_end_iter(),True)
         exec(script)
     except Exception:
-        message("Error in Script")
+        error='\n'.join(traceback.format_stack())
         traceback.print_exc()
+        message("Error in Script:\n"+error)
+        print(error)
         return
     print("Finsihed")
     mesh = mesh_result()
