@@ -1,7 +1,7 @@
 #include <Python.h>
 #include <stdio.h>
 
-static PyObject *hello_printHello(PyObject *self, PyObject *args)
+static PyObject *mycsg_printHello(PyObject *self, PyObject *args)
 {
   if (!PyArg_ParseTuple(args, "")) {
     return NULL;
@@ -11,13 +11,22 @@ static PyObject *hello_printHello(PyObject *self, PyObject *args)
   return Py_None;
 }
 
-static PyMethodDef helloMethods[] = {
-  {"printHello", hello_printHello, METH_VARARGS,
+static PyMethodDef mycsgMethods[] = {
+  {"printHello", mycsg_printHello, METH_VARARGS | METH_VARARGS,
     "Prints ’Hello World’."},
   {NULL, NULL, 0, NULL},
 };
 
-void inithello(void)
+static struct PyModuleDef mycsgmodule = {
+		PyModuleDef_HEAD_INIT,
+		"mycsg",
+		NULL,
+		-1,
+		mycsgMethods
+};
+
+PyMODINIT_FUNC
+PyInit_mycsg(void)
 {
-  Py_InitModule("hello", helloMethods);
+	return PyModule_Create(&mycsgmodule);
 }
