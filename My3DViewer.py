@@ -223,7 +223,8 @@ class My3DViewer(Gtk.GLArea):
 
         if self.draw_inst is not None:
             for inst in self.draw_inst:
-                glDrawElements(GL_TRIANGLES,inst[1],GL_UNSIGNED_INT,ctypes.c_void_p(inst[0])) 
+                print(inst)
+                glDrawElements(GL_TRIANGLES,inst[0]+inst[1],GL_UNSIGNED_INT,ctypes.c_void_p(inst[0])) 
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
@@ -419,7 +420,6 @@ class My3DViewer(Gtk.GLArea):
         self.pts = [] 
 
     def addVertices(self,result): # TODO soll ein shader programm index liefern
-        print("render Vertices")
         polygons=result.toPolygons()
 
         startind=len(self.indices)

@@ -144,7 +144,7 @@ def mesh_result(mode):
             union_opengl(["union",len(meshstack)]) 
         else:
             union_csg(["union",len(meshstack)]) 
-        return meshstack[0]
+        return None
     return None
 
 ####################################
@@ -1203,7 +1203,14 @@ def union_csg(inst):
     mesh_push(obj,key)
 
 def union_opengl(inst):
-    union_csg(inst) # TODO falsch
+    print("union_opengl")
+    n=inst[1]
+    print(n)
+    for i in range(n):
+        mesh,desc=mesh_pop("union")
+        inst=viewer3d.addVertices(mesh)
+        print(inst)
+        viewer3d.scheduleVertices(inst)
 
 #global concat
 #def concat(n=2):
@@ -1323,8 +1330,11 @@ def eval_instructions(mode):
             func=funcs[inst[0]+"_csg"]
         func(inst)
 
-    if mode == 1 or mode == 2:
-        mesh = mesh_result(mode)
+    if mode == 1:
+        mesh_result(1) # TODO name nicht mehr passend
+    if  mode == 2:
+        mesh_result(2) # TODO fix
+        mesh=meshstack[0]
         inst=viewer3d.addVertices(mesh)
         viewer3d.scheduleVertices(inst)
 
@@ -1415,7 +1425,8 @@ def export_stl_cb(mesh,filename):
                 f.write(struct.pack('<bb',0,0))
 
 def export_stl(window):
-    mesh = mesh_result(2)
+    mesh_result(2) # TODO fix
+    mesh = meshstack[0]
     text_filter=Gtk.FileFilter()
     text_filter.set_name("Text files")
     text_filter.add_mime_type("text/*")
