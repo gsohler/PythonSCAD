@@ -38,13 +38,13 @@ def keypressevent(window, event):
     keyval = event.keyval
 
     if keyval == Gdk.KEY_F1:
-        print("F1 pressed")
         save_script(window)
         message( "Script saved")
     if keyval == Gdk.KEY_F5:
-        print("F5 pressed")
-        render(window)
+        render(window,1)
     if keyval == Gdk.KEY_F6:
+        render(window,2)
+    if keyval == Gdk.KEY_F7:
         export_stl(window)
     if keyval == 65505 or keyval == 65506: # TODO
         modifiers=1
@@ -140,7 +140,7 @@ def mesh_result():
     if len(meshstack) > 0:
         if get_dimension(meshstack[0]) == 2:
             linear_extrude(1)
-        union(len(meshstack))
+        union_csg(["union",len(meshstack)]) # TODO fix
         return meshstack[0]
     return None
 
@@ -462,10 +462,7 @@ global cube
 def cube(dim=[1,1,1]): # Cached
     instructions.append(["cube",dim[0],dim[1],dim[2]])
 
-    inst=instructions[-1]
-
-
-    inst=instructions[-1]
+def cube_csg(inst):
     dim=inst[1:4]
 
     key="%f,%f,%fcube"%(dim[0],dim[1],dim[2])
@@ -478,14 +475,19 @@ def cube(dim=[1,1,1]): # Cached
     cache_put(key,obj)
     mesh_push(obj,key)
 
+def cube_opengl(inst):
+    cube_csg(inst)
+
 
 global sphere
 def sphere(r=1,center=[0,0,0]): # Cached
-    key="%f,%f,%f,%f,sphere"%(r,center[0],center[1],center[2])
     instructions.append(["sphere",r,center[0],center[1],center[2]])
 
-    inst=instructions[-1]
-    r,center[0],center[1],center[2]=inst[1:5]
+
+def sphere_csg(inst):
+    r=inst[1]
+    center=inst[2:]
+    key="%f,%f,%f,%f,sphere"%(r,center[0],center[1],center[2])
 
     obj=cache_find(key)
     if obj is not None:
@@ -495,13 +497,16 @@ def sphere(r=1,center=[0,0,0]): # Cached
     cache_put(key,obj)
     mesh_push(obj,key)
 
+def sphere_opengl(inst):
+    sphere_csg(inst)
+
 global cylinder
 def cylinder(h=1,r=1,n=16): # Cached
-    key="%f,%f%dcylidner"%(r,h,n)
     instructions.append(["cylidner",r,h,n])
 
-    inst=instructions[-1]
+def cylinder_csg(inst):
     r,h,n = inst[1:4]
+    key="%f,%f%dcylidner"%(r,h,n)
 
     obj=cache_find(key)
     if obj is not None:
@@ -513,11 +518,11 @@ def cylinder(h=1,r=1,n=16): # Cached
 
 global cone
 def cone(h=1,r=1,n=16): # Cached
-    key="%f,%f%dcone"%(r,h,n)
     instructions.append(["cone",r,h,n])
 
-    inst=instructions[-1]
+def cone_csg(inst):
     r,h,n = inst[1:4]
+    key="%f,%f%dcone"%(r,h,n)
 
     obj=cache_find(key)
     if obj is not None:
@@ -854,21 +859,24 @@ def ang_convert(span,steps):
 global translate
 def translate(off): # Cached
 
-    obj,desc=mesh_pop("translate")
-
-    dim=get_dimension(obj)
+    dim=len(off)
     if dim == 2:
-        key="%s%f%ftrans"%(desc,off[0],off[1])
         instructions.append(["translate",off[0],off[1]])
-
-        inst=instructions[-1]
-        off=inst[1:3]
-
     else:
         instructions.append(["translate",off[0],off[1],off[2]])
 
-        inst=instructions[-1]
+def translate_csg(inst):
+    dim=len(inst)-1
+    obj,desc=mesh_pop("translate")
+
+    if dim == 2:
+        off=inst[1:3]
+        key="%s%f%ftrans"%(desc,off[0],off[1])
+    else:
         off=inst[1:4]
+        print(off)
+        key="%s%f%f%ftrans"%(desc,off[0],off[1],off[2])
+
 
     newobj=cache_find(key)
     if newobj is not None:
@@ -1167,14 +1175,12 @@ def difference():
 
 global union # Cached
 def union(n=2):
-    key=""
-    stk=[]
-
     instructions.append(["union",n])
 
-    inst=instructions[-1]
+def union_csg(inst):
+    stk=[]
+    key=""
     n=inst[1]
-
 
     for i in range(n):
         obj,desc=mesh_pop("union")
@@ -1192,6 +1198,9 @@ def union(n=2):
         obj =obj.union(stk.pop())
     cache_put(key,obj)
     mesh_push(obj,key)
+
+def union_opengl(inst):
+    union_csg(inst) # TODO falsch
 
 #global concat
 #def concat(n=2):
@@ -1302,12 +1311,22 @@ def volume(): # TODO fix function
 # Top
 ####################################
 
+def eval_instructions(mode):
+    funcs=globals()
+    for inst in instructions:
+        if mode == 1:
+            func=funcs[inst[0]+"_opengl"]
+        if mode == 2:
+            func=funcs[inst[0]+"_csg"]
+        func(inst)
 
-
-def render(window):
+def render(window,mode):
     mesh_init()
     viewer_obj=None
+    print("Mode is",mode)
+        
 
+    # Convert Python to internal instructions
     try:
         buffer = tv.get_buffer()
         script = buffer.get_text(buffer.get_start_iter(),buffer.get_end_iter(),True)
@@ -1318,8 +1337,11 @@ def render(window):
         message("Error in Script:\n"+error)
         print(error)
         return
-    print("Finsihed")
-    print(instructions)
+    print(instructions,mode)
+
+    # Now evaluate the Instructions
+    eval_instructions(mode)
+
     mesh = mesh_result()
 
     if mesh is None:
@@ -1383,7 +1405,7 @@ def export_stl_cb(mesh,filename):
                 f.write(struct.pack('<bb',0,0))
 
 def export_stl(window):
-    mesh = get_result()
+    mesh = mesh_result()
     text_filter=Gtk.FileFilter()
     text_filter.set_name("Text files")
     text_filter.add_mime_type("text/*")
