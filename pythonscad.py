@@ -105,10 +105,6 @@ def on_text_view_expose_event(text_view, event):
 
 meshstack = []
 descstack = []
-def mesh_init():
-    global meshstack
-    meshstack = []
-    descstack = []
 
 def mesh_push(obj,desc):
     global meshstack
@@ -166,6 +162,20 @@ def cache_put(key,obj):
     mesh_cache[key]=obj
 
 
+####################################
+# Build instructions
+####################################
+
+instructions = []
+
+def mesh_init():
+    global meshstack
+    global instructions
+    global descstack
+    meshstack = []
+    descstack = []
+    instructions = []
+
 
 ####################################
 # Script utility functions
@@ -194,6 +204,10 @@ def get_dimension(obj):
 
 global dump
 def dump():
+    instructions.append(["dump"])
+
+    inst=instructions[-1]
+
     obj=mesh_top()
     if get_dimension(obj) == 2:
         print("2D Vertices")
@@ -213,6 +227,11 @@ def dump():
 global dup
 def dup(n=1):
     obj,desc=mesh_top()
+    instructions.append(["dup",n])
+
+    inst=instructions[-1]
+    n=inst[1]
+
     for i in range(n):
         mesh_push(obj,desc)
 
@@ -227,6 +246,11 @@ def square(s=1): # Cached
         l=s[1]
 
     key="%f,%fsquare"%(w,l)
+    instructions.append(["square",w,l])
+
+    inst=instructions[-1]
+    w,l = inst[2:3]
+
     obj=cache_find(key)
     if obj is not None:
         mesh_push(obj,key)
@@ -274,6 +298,10 @@ def polygon(path): # Cached
     for pt in path:
         key=key+"%f,%f"%(pt[0],pt[1])
     key=key+"polygon"
+    instructions.append(["polygon",path])
+
+    inst=instructions[-1]
+    path=inst[1]
     obj=cache_find(key)
     if obj is not None:
         mesh_push(obj,key)
@@ -432,6 +460,14 @@ def bezier_surface(pts,n=5,zmin=-1):
 
 global cube
 def cube(dim=[1,1,1]): # Cached
+    instructions.append(["cube",dim[0],dim[1],dim[2]])
+
+    inst=instructions[-1]
+
+
+    inst=instructions[-1]
+    dim=inst[1:4]
+
     key="%f,%f,%fcube"%(dim[0],dim[1],dim[2])
     obj=cache_find(key)
     if obj is not None:
@@ -446,6 +482,11 @@ def cube(dim=[1,1,1]): # Cached
 global sphere
 def sphere(r=1,center=[0,0,0]): # Cached
     key="%f,%f,%f,%f,sphere"%(r,center[0],center[1],center[2])
+    instructions.append(["sphere",r,center[0],center[1],center[2]])
+
+    inst=instructions[-1]
+    r,center[0],center[1],center[2]=inst[1:5]
+
     obj=cache_find(key)
     if obj is not None:
         mesh_push(obj,key)
@@ -457,6 +498,11 @@ def sphere(r=1,center=[0,0,0]): # Cached
 global cylinder
 def cylinder(h=1,r=1,n=16): # Cached
     key="%f,%f%dcylidner"%(r,h,n)
+    instructions.append(["cylidner",r,h,n])
+
+    inst=instructions[-1]
+    r,h,n = inst[1:4]
+
     obj=cache_find(key)
     if obj is not None:
         mesh_push(obj,key)
@@ -468,6 +514,11 @@ def cylinder(h=1,r=1,n=16): # Cached
 global cone
 def cone(h=1,r=1,n=16): # Cached
     key="%f,%f%dcone"%(r,h,n)
+    instructions.append(["cone",r,h,n])
+
+    inst=instructions[-1]
+    r,h,n = inst[1:4]
+
     obj=cache_find(key)
     if obj is not None:
         mesh_push(obj,key)
@@ -661,6 +712,11 @@ def linear_extrude(height=1,n=2,func=None): # Cached TODO for no func
     if func is None:
         obj,desc=mesh_pop("linear_extrude")
         key="%s%f%dlinextrude"%(desc,height,n)
+        instructions.append(["linear_extrude",height,n])
+
+        inst=instructions[-1]
+        height,n = inst[1:3]
+
         newobj=cache_find(key)
         if newobj is not None:
             mesh_push(newobj,key)
@@ -716,6 +772,11 @@ def rotate_extrude(n=16,a1=0,a2=360,elevation=0,func=None):
     if func is None:
         obj,desc=mesh_pop("extrude")
         key="%s%d%f%f%frotext"%(desc,n,a1,a2,elevation)
+        instructions.append(["rotate_extrude",n,a1,a2,elevation])
+
+        inst=instructions[-1]
+        n,a1,a2,elevation = inst[1:5]
+
         newobj=cache_find(key)
         if newobj is not None:
             mesh_push(newobj,key)
@@ -798,8 +859,17 @@ def translate(off): # Cached
     dim=get_dimension(obj)
     if dim == 2:
         key="%s%f%ftrans"%(desc,off[0],off[1])
+        instructions.append(["translate",off[0],off[1]])
+
+        inst=instructions[-1]
+        off=inst[1:3]
+
     else:
-        key="%s%f%f%ftrans"%(desc,off[0],off[1],off[2])
+        instructions.append(["translate",off[0],off[1],off[2]])
+
+        inst=instructions[-1]
+        off=inst[1:4]
+
     newobj=cache_find(key)
     if newobj is not None:
         mesh_push(newobj,key)
@@ -828,10 +898,20 @@ def scale(s):
         if type(s) is not list:
             s = [s,s]
         key="%s%f%fscale"%(desc,s[0],s[1])
+        instructions.append(["scale",s[0],s[1]])
+
+        inst=instructions[-1]
+        s=inst[1:3]
+
     else:
         if type(s) is not list:
             s = [s,s,s]
         key="%s%f%f%fscale"%(desc,s[0],s[1],s[2])
+        instructions.append(["scale",s[0],s[1],s[2]])
+
+        inst=instructions[-1]
+        s=inst[1:4]
+
 
     newobj=cache_find(key)
     if newobj is not None:
@@ -863,6 +943,11 @@ global rotate
 def rotate(axis,rot): # Cached
     obj,desc=mesh_pop("rotate")
     key="%s%f,%f,%f,%frot"%(desc,axis[0],axis[1],axis[2],rot)
+    instructions.append(["rotate",axis[0],axis[1],axis[2],rot])
+
+    inst=instructions[-1]
+    axis[0],axis[1],axis[2],rot=inst[1:5]
+
     newobj=cache_find(key)
     if newobj is not None:
         mesh_push(newobj,key)
@@ -876,6 +961,11 @@ global mirror
 def mirror(v): # Cached
     obj,desc=mesh_pop("mirror")
     key="%s%f%f%fmirror"%(desc,v[0],v[1],v[2])
+    instructions.append(["mirror",v[0],v[1],v[2]])
+
+    inst=instructions[-1]
+    v=inst[1:4]
+
     newobj=cache_find(key)
     if newobj is not None:
         mesh_push(newobj,key)
@@ -1061,6 +1151,11 @@ def difference():
     obj2,desc2=mesh_pop("difference")
     obj1,desc1=mesh_pop("difference")
     key="%s%sdiff"%(desc1,desc2)
+    instructions.append(["difference",2])
+
+    inst=instructions[-1]
+    n=inst[1]
+
     obj=cache_find(key)
     if obj is not None:
         mesh_push(obj,key)
@@ -1074,6 +1169,12 @@ global union # Cached
 def union(n=2):
     key=""
     stk=[]
+
+    instructions.append(["union",n])
+
+    inst=instructions[-1]
+    n=inst[1]
+
 
     for i in range(n):
         obj,desc=mesh_pop("union")
@@ -1142,6 +1243,11 @@ global intersection
 def intersection(n=2): # Cached
     key=""
     stk=[]
+    instructions.append(["intersection",n])
+
+    inst=instructions[-1]
+    n=inst[1]
+
 
     for i in range(n):
         obj,desc=mesh_pop("intersection")
@@ -1213,6 +1319,7 @@ def render(window):
         print(error)
         return
     print("Finsihed")
+    print(instructions)
     mesh = mesh_result()
 
     if mesh is None:
