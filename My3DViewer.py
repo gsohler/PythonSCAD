@@ -99,39 +99,17 @@ class My3DViewer(Gtk.GLArea):
         fs = shaders.compileShader(FRAGMENT_SHADER, GL_FRAGMENT_SHADER)
         self.shader = shaders.compileProgram(vs, fs)
 
-    def updateModel(self,vertices,normals, colors, indices):
+    def copyDataToBuffers(self):
 
-
-        npobj = np.arange(3*len(vertices),dtype=np.float32)
-        for i in range(int(len(vertices)/3)):
-            npobj[i*9+0] = vertices[i*3+0]
-            npobj[i*9+1] = vertices[i*3+1]
-            npobj[i*9+2] = vertices[i*3+2]
-
-            npobj[i*9+3] = normals[i*3+0] 
-            npobj[i*9+4] = normals[i*3+1]
-            npobj[i*9+5] = normals[i*3+2]
-
-            npobj[i*9+6] = 0.8# colors[i*3+0]
-            npobj[i*9+7] = 0.8# colors[i*3+1]
-            npobj[i*9+8] = 0.1#colors[i*3+2]
-
-        self.updateModelSub(npobj,indices)
-
-    def updateModel1(self, obj, indices):
-
-        npobj = np.arange(len(obj)*9,dtype=np.float32)
-        for i in range(len(obj)):
+        npobj = np.arange(len(self.pts)*9,dtype=np.float32)
+        for i in range(len(self.pts)):
             for j in range(9):
-               npobj[i*9+j] = obj[i][j]
+               npobj[i*9+j] = self.pts[i][j]
 
-        self.updateModelSub(npobj,indices)
 
-    def updateModelSub(self,npobj, indices):
+        npindices = np.array(self.indices, dtype=np.int32)
 
         glBindVertexArray( self.vao )
-
-        npindices = np.array(indices, dtype=np.int32)
 
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
@@ -147,7 +125,7 @@ class My3DViewer(Gtk.GLArea):
 
         glBufferData(GL_ARRAY_BUFFER,4*len(npobj),npobj,GL_DYNAMIC_DRAW)
 
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(indices), npindices, GL_DYNAMIC_DRAW) 
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(npindices), npindices, GL_DYNAMIC_DRAW) 
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
@@ -216,7 +194,8 @@ class My3DViewer(Gtk.GLArea):
 
         # Set as current vertex array
 
-        self.updateModel([],[],[],[]) # TODO einfacher
+        self.resetVertices()
+        self.copyDataToBuffers() # TODO einfacher
 
         self.matrixModelView = None
 
@@ -226,7 +205,7 @@ class My3DViewer(Gtk.GLArea):
 
 
     def on_draw(self, widget, *args):
-#        print('render event')
+        print('draw event')
         self.screen=widget.get_allocation()
 
         if self.matrixModelView is None:
@@ -242,7 +221,9 @@ class My3DViewer(Gtk.GLArea):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClearDepth(1.0)
 
-        glDrawElements(GL_TRIANGLES,len(self.indices),GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
+        if self.draw_inst is not None:
+            for inst in self.draw_inst:
+                glDrawElements(GL_TRIANGLES,inst[1],GL_UNSIGNED_INT,ctypes.c_void_p(inst[0])) 
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
@@ -402,7 +383,6 @@ class My3DViewer(Gtk.GLArea):
 
     def __init__(self):
         Gtk.GLArea.__init__(self)
-        self.indices = []
         self.set_required_version(3, 3)
 
 # For mouse control
@@ -431,26 +411,35 @@ class My3DViewer(Gtk.GLArea):
 
         self.set_double_buffered(GL_FALSE)
         self.set_size_request(500, 500)
+        self.draw_inst = None
 
-    def renderVertices(self,result):
-        pts = [] 
+    def resetVertices(self):
+        self.draw_inst = []
         self.indices = []
+        self.pts = [] 
+
+    def addVertices(self,result): # TODO soll ein shader programm index liefern
+        print("render Vertices")
         polygons=result.toPolygons()
 
+        startind=len(self.indices)
        	for polygon in polygons:
             n = polygon.plane.normal
             indices = []
             for v in polygon.vertices:
                 pt = [v.pos.x, v.pos.y, v.pos.z, n.x, n.y, n.z, 0.8, 0.8, 0.1 ]
-                if not pt in pts:
-                    pts.append(pt)
-                index = pts.index(pt)
+                if not pt in self.pts:
+                    self.pts.append(pt)
+                index = self.pts.index(pt)
                 indices.append(index)
             for i in range(len(indices)-2): # TODO delaunay here
                 self.indices.append(indices[0])
                 self.indices.append(indices[i+1])
                 self.indices.append(indices[i+2])
 
-        self.updateModel1(pts, self.indices)
-        self.queue_draw()
+        inst=[startind,len(self.indices)-startind]
+        return inst
+
+    def scheduleVertices(self,inst):
+        self.draw_inst.append(inst)
 

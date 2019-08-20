@@ -133,14 +133,17 @@ def mesh_top(purpose=None):
         return None
     return meshstack[-1], descstack[-1]
 
-def mesh_result():
+def mesh_result(mode):
     global viewer_obj
     if viewer_obj is not None:
         return viewer_obj[0]
     if len(meshstack) > 0:
         if get_dimension(meshstack[0]) == 2:
             linear_extrude(1)
-        union_csg(["union",len(meshstack)]) # TODO fix
+        if mode == 1:
+            union_opengl(["union",len(meshstack)]) 
+        else:
+            union_csg(["union",len(meshstack)]) 
         return meshstack[0]
     return None
 
@@ -1320,6 +1323,11 @@ def eval_instructions(mode):
             func=funcs[inst[0]+"_csg"]
         func(inst)
 
+    if mode == 1 or mode == 2:
+        mesh = mesh_result(mode)
+        inst=viewer3d.addVertices(mesh)
+        viewer3d.scheduleVertices(inst)
+
 def render(window,mode):
     mesh_init()
     viewer_obj=None
@@ -1340,37 +1348,39 @@ def render(window,mode):
     print(instructions,mode)
 
     # Now evaluate the Instructions
+    viewer3d.resetVertices()
+
     eval_instructions(mode)
 
-    mesh = mesh_result()
 
-    if mesh is None:
-        message( "Error: No Objects generated")
-        return
+#    if mesh is None:
+#        message( "Error: No Objects generated")
+#        return
+#
 
-
-    polygons=mesh.toPolygons()
-    ptmin = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
-    ptmax = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
-    for poly in polygons:
-        for pt in poly.vertices:
-            if pt.pos.x > ptmax[0]:
-                ptmax[0] = pt.pos.x
-            if pt.pos.x < ptmin[0]:
-                ptmin[0] = pt.pos.x
-
-            if pt.pos.y > ptmax[1]:
-                ptmax[1] = pt.pos.y
-            if pt.pos.y < ptmin[1]:
-                ptmin[1] = pt.pos.y
-
-            if pt.pos.z > ptmax[2]:
-                ptmax[2] = pt.pos.z
-            if pt.pos.z < ptmin[2]:
-                ptmin[2] = pt.pos.z
-
-    print("Dimension [%g %g %g]\n"%(ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2]))
-    viewer3d.renderVertices(mesh)
+#    polygons=mesh.toPolygons()
+#    ptmin = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
+#    ptmax = [ polygons[0].vertices[0].pos.x,polygons[0].vertices[0].pos.y, polygons[0].vertices[0].pos.z ]
+#    for poly in polygons:
+#        for pt in poly.vertices:
+#            if pt.pos.x > ptmax[0]:
+#                ptmax[0] = pt.pos.x
+#            if pt.pos.x < ptmin[0]:
+#                ptmin[0] = pt.pos.x
+#
+#            if pt.pos.y > ptmax[1]:
+#                ptmax[1] = pt.pos.y
+#            if pt.pos.y < ptmin[1]:
+#                ptmin[1] = pt.pos.y
+#
+#            if pt.pos.z > ptmax[2]:
+#                ptmax[2] = pt.pos.z
+#            if pt.pos.z < ptmin[2]:
+#                ptmin[2] = pt.pos.z
+#
+#    print("Dimension [%g %g %g]\n"%(ptmax[0]-ptmin[0],ptmax[1]-ptmin[1],ptmax[2]-ptmin[2]))
+    viewer3d.copyDataToBuffers()
+    viewer3d.queue_draw()
 
 
 
@@ -1405,7 +1415,7 @@ def export_stl_cb(mesh,filename):
                 f.write(struct.pack('<bb',0,0))
 
 def export_stl(window):
-    mesh = mesh_result()
+    mesh = mesh_result(2)
     text_filter=Gtk.FileFilter()
     text_filter.set_name("Text files")
     text_filter.add_mime_type("text/*")
