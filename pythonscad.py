@@ -26,6 +26,9 @@ from gi.repository import Gtk
 
 from csg.core import CSG
 from csg.geom import Vertex, Vector, Polygon
+import  mycsg.mycsg  as mycsg
+
+mycsg.printHello()
 
 from My3DViewer import *
 
@@ -1185,6 +1188,9 @@ def union_csg(inst):
     key=""
     n=inst[1]
 
+    global meshstack
+    print("union csg",len(meshstack))
+
     for i in range(n):
         obj,desc=mesh_pop("union")
         stk.append(obj)
@@ -1198,7 +1204,9 @@ def union_csg(inst):
 
     obj=stk.pop()
     for i in range(n-1):
-        obj =obj.union(stk.pop())
+        obj1=stk.pop()
+        mycsg.union(obj,obj1)
+        obj =obj.union(obj1)
     cache_put(key,obj)
     mesh_push(obj,key)
 

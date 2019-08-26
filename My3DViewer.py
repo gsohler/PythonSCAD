@@ -21,6 +21,7 @@ import numpy as np
 
 from csg.geom import Vertex, Vector
 
+experiment=False # TODO loswerden
 # Local Space
 # -> Model Matrix, wie ist das Ding gedreht im Raum
 # World Space
@@ -100,7 +101,7 @@ class My3DViewer(Gtk.GLArea):
         self.shader = shaders.compileProgram(vs, fs)
 
     def copyDataToBuffers(self):
-
+        print("copy")
         npobj = np.arange(len(self.pts)*9,dtype=np.float32)
         for i in range(len(self.pts)):
             for j in range(9):
@@ -109,22 +110,31 @@ class My3DViewer(Gtk.GLArea):
 
         npindices = np.array(self.indices, dtype=np.int32)
 
-        glBindVertexArray( self.vao )
+        if experiment == False:
+            glBindVertexArray( self.vao )
 
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
+            glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
+
+        # Get the position of the 'position' in parameter of our shader and bind it.
+
+        if experiment == True:
+            npindices = self.xindices
+            npobj=self.vertices
         glEnableVertexAttribArray(self.attribVertexPosition)
-        glVertexAttribPointer(self.attribVertexPosition, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*0))
-
         glEnableVertexAttribArray(self.attribVertexNormal)
-        glVertexAttribPointer(self.attribVertexNormal, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*3))
-
         glEnableVertexAttribArray(self.attribVertexColor)
-        glVertexAttribPointer(self.attribVertexColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
+
+
+        if experiment == False:
+            glVertexAttribPointer(self.attribVertexPosition, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*0))
+            glVertexAttribPointer(self.attribVertexNormal, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*3))
+            glVertexAttribPointer(self.attribVertexColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
+
+
 
         glBufferData(GL_ARRAY_BUFFER,4*len(npobj),npobj,GL_DYNAMIC_DRAW)
-
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(npindices), npindices, GL_DYNAMIC_DRAW) 
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
@@ -195,6 +205,14 @@ class My3DViewer(Gtk.GLArea):
         # Set as current vertex array
 
         self.resetVertices()
+        if experiment == True:
+            glBindVertexArray( self.vao )
+            glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
+            glVertexAttribPointer(self.attribVertexNormal, 3, GL_FLOAT, GL_FALSE, 4*9*2, ctypes.c_void_p(4*3))
+            glVertexAttribPointer(self.attribVertexColor, 3, GL_FLOAT, GL_FALSE, 4*9*2, ctypes.c_void_p(4*6))
+            glVertexAttribPointer(self.attribVertexPosition, 3, GL_FLOAT, GL_FALSE, 4*9*2, ctypes.c_void_p(4*0))
+
         self.copyDataToBuffers() # TODO einfacher
 
         self.matrixModelView = None
@@ -204,7 +222,8 @@ class My3DViewer(Gtk.GLArea):
         return True
 
 
-    def on_draw(self, widget, *args):
+
+    def on_draw(self, widget, ctx):
         print('draw event')
         self.screen=widget.get_allocation()
 
@@ -221,6 +240,8 @@ class My3DViewer(Gtk.GLArea):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClearDepth(1.0)
 
+        if experiment == True:
+            glDrawElements(GL_TRIANGLES,3,GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
         if self.draw_inst is not None:
             for inst in self.draw_inst:
                 print(inst)
@@ -230,9 +251,12 @@ class My3DViewer(Gtk.GLArea):
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
         glBindVertexArray( 0 )
+        if experiment == True:
+            glUseProgram(0)
         glFlush()
+        if experiment == False:
+            glBegin(GL_LINES); # TODO dies weg
 
-        glBegin(GL_LINES); # TODO dies weg
 
         return True
 
@@ -385,6 +409,18 @@ class My3DViewer(Gtk.GLArea):
     def __init__(self):
         Gtk.GLArea.__init__(self)
         self.set_required_version(3, 3)
+        if experiment == True:
+            self.vertices = np.array([-0.6, -0.6, 0.0,1.0, 1.0, 1.0,1,0,0,
+                             0.0, 0.6, 0.0,1.0, 1.0, 1.0,0,1,0,
+                             0.6, -0.6, 0.0,1.0, 1.0, 1.0,0,0,1,
+                             0.7, -0.1, 0.0,1.0, 1.0, 1.0,1,0,0,
+                             0.8, 0.1, 0.0,1.0, 1.0, 1.0,0,1,0,
+                             0.9, -0.1, 0.0,1.0, 1.0, 1.0,0,0,1
+                             ], dtype=np.float32)
+
+            self.xindices = np.array([0,1,2,3,4,5],dtype=np.int32)
+
+
 
 # For mouse control
         self.button_pressed = 0
