@@ -135,8 +135,8 @@ class My3DViewer(Gtk.GLArea):
 
 
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+#        glBindBuffer(GL_ARRAY_BUFFER, 0)
+#        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
 
     def updateTransform(self,phi,theta):
@@ -204,18 +204,21 @@ class My3DViewer(Gtk.GLArea):
 
         self.pts = [] 
         self.resetVertices()
-        self.pts = self.vertices
-        self.indices = self.xindices
-#        self.draw_inst=[[0,3]]
+#        self.pts = self.vertices
+#        self.indices = self.xindices
+#        self.draw_inst=[[0,3]] # TODO
 
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
+
 
         self.copyDataToBuffers() # TODO einfacher
 
         self.matrixModelView = None
 
         self.queue_draw()
+
+
 
         return True
 
@@ -248,8 +251,6 @@ class My3DViewer(Gtk.GLArea):
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
         glFlush()
-        if experiment == False:
-            glBegin(GL_LINES); # TODO dies weg
 
 
         return True
@@ -398,6 +399,8 @@ class My3DViewer(Gtk.GLArea):
 
     def __init__(self):
         Gtk.GLArea.__init__(self)
+        if experiment == False:
+            glBegin(GL_LINES); # TODO dies weg
         self.set_required_version(3, 3)
         self.vertices = [
                                 [-0.6, -0.6, 0.0,1.0, 1.0, 1.0,1,0,0],
@@ -433,16 +436,17 @@ class My3DViewer(Gtk.GLArea):
 
 
 
-        self.set_double_buffered(GL_FALSE)
+        self.set_double_buffered(GL_TRUE)
         self.set_size_request(500, 500)
         self.draw_inst = None
+
 
     def resetVertices(self):
         self.draw_inst = []
         self.indices = []
-        self.pts = [] 
+        self.pts = []  # TODO activate
 
-    def addVertices(self,result): # TODO soll ein shader programm index liefern
+    def addVertices(self,result): 
         polygons=result.toPolygons()
 
         startind=len(self.indices)
