@@ -102,45 +102,42 @@ class My3DViewer(Gtk.GLArea):
 
     def copyDataToBuffers(self):
         print("copy")
+
+        if experiment == True:
+            self.pts=self.vertices
+            self.indices = self.xindices
+
         npobj = np.arange(len(self.pts)*9,dtype=np.float32)
         for i in range(len(self.pts)):
             for j in range(9):
-               npobj[i*9+j] = self.pts[i][j]
-
-
+                npobj[i*9+j] = self.pts[i][j]
         npindices = np.array(self.indices, dtype=np.int32)
 
-        if experiment == False:
-            glBindVertexArray( self.vao )
-
-            glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
 
         # Get the position of the 'position' in parameter of our shader and bind it.
 
-        if experiment == True:
-            npindices = self.xindices
-            npobj=self.vertices
         glEnableVertexAttribArray(self.attribVertexPosition)
         glEnableVertexAttribArray(self.attribVertexNormal)
         glEnableVertexAttribArray(self.attribVertexColor)
 
 
-        if experiment == False:
-            glVertexAttribPointer(self.attribVertexPosition, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*0))
-            glVertexAttribPointer(self.attribVertexNormal, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*3))
-            glVertexAttribPointer(self.attribVertexColor, 3, GL_FLOAT, GL_FALSE, 4*9, ctypes.c_void_p(4*6))
 
-
+        glVertexAttribPointer(self.attribVertexPosition, 3, GL_FLOAT, GL_FALSE, 4*9*1, ctypes.c_void_p(4*0))
+        glVertexAttribPointer(self.attribVertexNormal,   3, GL_FLOAT, GL_FALSE, 4*9*1, ctypes.c_void_p(4*3))
+        glVertexAttribPointer(self.attribVertexColor,    3, GL_FLOAT, GL_FALSE, 4*9*1, ctypes.c_void_p(4*6))
 
         glBufferData(GL_ARRAY_BUFFER,4*len(npobj),npobj,GL_DYNAMIC_DRAW)
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, 4*len(npindices), npindices, GL_DYNAMIC_DRAW) 
 
+
+
+
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
-        glBindVertexArray( 0 )
 
     def updateTransform(self,phi,theta):
 
@@ -176,10 +173,10 @@ class My3DViewer(Gtk.GLArea):
 
 
         # set uniform values
-        lightPosition = [0.0, 0.0, 1.0, 0.0];
-        lightAmbient  = [0.3, 0.3, 0.3, 1.0];
-        lightDiffuse  = [0.7, 0.7, 0.7, 1.0];
-        lightSpecular = [1.0, 1.0, 1.0, 1.0];
+        lightPosition = np.array([0.0, 0.0, 1.0, 0.0],dtype=np.float32);
+        lightAmbient  = np.array([0.3, 0.3, 0.3, 1.0],dtype=np.float32);
+        lightDiffuse  = np.array([0.7, 0.7, 0.7, 1.0],dtype=np.float32);
+        lightSpecular = np.array([1.0, 1.0, 1.0, 1.0],dtype=np.float32);
         glUniform4fv(self.uniformLightPosition, 1, lightPosition); 
         glUniform4fv(self.uniformLightAmbient, 1, lightAmbient);
         glUniform4fv(self.uniformLightDiffuse, 1, lightDiffuse);
@@ -201,17 +198,18 @@ class My3DViewer(Gtk.GLArea):
 
         # Generate empty vertex Array Object
         self.vao = glGenVertexArrays(1)
+        glBindVertexArray( self.vao )
 
         # Set as current vertex array
 
+        self.pts = [] 
         self.resetVertices()
-        if experiment == True:
-            glBindVertexArray( self.vao )
-            glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
-            glVertexAttribPointer(self.attribVertexNormal, 3, GL_FLOAT, GL_FALSE, 4*9*2, ctypes.c_void_p(4*3))
-            glVertexAttribPointer(self.attribVertexColor, 3, GL_FLOAT, GL_FALSE, 4*9*2, ctypes.c_void_p(4*6))
-            glVertexAttribPointer(self.attribVertexPosition, 3, GL_FLOAT, GL_FALSE, 4*9*2, ctypes.c_void_p(4*0))
+        self.pts = self.vertices
+        self.indices = self.xindices
+#        self.draw_inst=[[0,3]]
+
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
         self.copyDataToBuffers() # TODO einfacher
 
@@ -230,18 +228,17 @@ class My3DViewer(Gtk.GLArea):
         if self.matrixModelView is None:
             self.updateTransform(self.RX,self.RZ)
 
-        glUseProgram(self.shader)
+#        glUseProgram(self.shader)
 
-        glBindVertexArray( self.vao )
 
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ibo)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glClearDepth(1.0)
 
         if experiment == True:
             glDrawElements(GL_TRIANGLES,3,GL_UNSIGNED_INT,ctypes.c_void_p(0)) 
+        print(self.indices)
         if self.draw_inst is not None:
             for inst in self.draw_inst:
                 print(inst)
@@ -250,9 +247,6 @@ class My3DViewer(Gtk.GLArea):
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
-        glBindVertexArray( 0 )
-        if experiment == True:
-            glUseProgram(0)
         glFlush()
         if experiment == False:
             glBegin(GL_LINES); # TODO dies weg
@@ -393,32 +387,25 @@ class My3DViewer(Gtk.GLArea):
         gluLookAt(posX, posY, posZ, targetX, targetY, targetZ, 0, 1, 0); # eye(x,y,z), focal(x,y,z), up(x,y,z)
 
     def initGL(self):
-        glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
-        glPixelStorei(GL_UNPACK_ALIGNMENT,4)
-
-        glEnable(GL_DEPTH_TEST)
+#        glPixelStorei(GL_UNPACK_ALIGNMENT,4)
         glEnable(GL_CULL_FACE)
-
         glClearColor(0, 0, 0, 0)                   # background color
         glClearStencil(0)                          # clear stencil buffer
-        glClearDepth(1.0)                         # 0 is near, 1 is far
+        glClearDepth(1.0)
         glDepthFunc(GL_LEQUAL)
         return
 
     def __init__(self):
         Gtk.GLArea.__init__(self)
         self.set_required_version(3, 3)
-        if experiment == True:
-            self.vertices = np.array([-0.6, -0.6, 0.0,1.0, 1.0, 1.0,1,0,0,
-                             0.0, 0.6, 0.0,1.0, 1.0, 1.0,0,1,0,
-                             0.6, -0.6, 0.0,1.0, 1.0, 1.0,0,0,1,
-                             0.7, -0.1, 0.0,1.0, 1.0, 1.0,1,0,0,
-                             0.8, 0.1, 0.0,1.0, 1.0, 1.0,0,1,0,
-                             0.9, -0.1, 0.0,1.0, 1.0, 1.0,0,0,1
-                             ], dtype=np.float32)
+        self.vertices = [
+                                [-0.6, -0.6, 0.0,1.0, 1.0, 1.0,1,0,0],
+                                [ 0.6, -0.6, 0.0,1.0, 1.0, 1.0,0,1,0],
+                                [ 0.0,  0.6, 0.0,1.0, 1.0, 1.0,0,0,1]
+                             ]
 
-            self.xindices = np.array([0,1,2,3,4,5],dtype=np.int32)
+        self.xindices = [0,1,2]
 
 
 
