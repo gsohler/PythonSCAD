@@ -1205,8 +1205,9 @@ def union_csg(inst):
     obj=stk.pop()
     for i in range(n-1):
         obj1=stk.pop()
-        mycsg.union(obj,obj1)
-        obj =obj.union(obj1)
+#        obj = mycsg.union(obj,obj1)
+        obj =obj.union(obj1) # TODO genereller
+
     cache_put(key,obj)
     mesh_push(obj,key)
 

@@ -11,8 +11,79 @@
 
 
 
+
 bsp_node_t *mesh_to_bsp(mesh_t *mesh);
 void v3_cross(float3 *result, float3 v1, float3 v2, int normalize);
+
+typedef struct {
+        mesh_t proto;
+	klist_t(poly) *polygons;
+} poly_mesh_t;
+
+void dump_polygons(klist_t(poly)* polygons)
+{
+	kliter_t(poly) *iter;
+
+        iter = kl_begin(polygons);
+        for(; iter != kl_end(polygons); iter = kl_next(iter))
+	{
+		printf("item %p\n",kl_val(iter));
+        }
+}
+
+int count_polygons(klist_t(poly)* list)
+{
+	int len=0;
+	kliter_t(poly) *iter;
+        iter = kl_begin(list);
+        for(; iter != kl_end(list); iter = kl_next(iter))
+	{
+		len++;
+        }
+	return len;
+}
+
+int poly_mesh_init(void *self, void *data) {
+	bsp_node_t *bsp = (bsp_node_t *) data;;
+	poly_mesh_t *mesh = (poly_mesh_t*)self;
+	printf("init called with data %p\n",bsp);
+
+	mesh->polygons = bsp_to_polygons(bsp, 1, NULL);
+	return 0;
+}
+
+void poly_mesh_destroy(void *self) {
+	printf("destroy called\n");
+//	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
+//	free_bsp_tree(mesh->bsp);
+//	free(self);
+}
+
+int poly_mesh_poly_count(void *self) {
+	printf("count called\n");
+//	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
+//	return bsp_count_polygons(mesh->bsp);
+	return 0;
+}
+
+
+klist_t(poly)* poly_mesh_to_polygons(void *self) {
+
+	printf("polygons called self=%p\n",self);
+	// *kl_pushp(poly, dst) = copy;
+	poly_mesh_t *mesh = (poly_mesh_t*)self;
+	return mesh->polygons;
+//	return bsp_to_polygons(mesh->bsp, 0, NULL);
+//	return polygons;
+}
+
+mesh_t poly_mesh_t_Proto = {
+        .init = poly_mesh_init,
+        .destroy = poly_mesh_destroy,
+        .poly_count = poly_mesh_poly_count,
+        .to_polygons = poly_mesh_to_polygons,
+};
+
 
 // 0=union, 1=difference, 2=intersection
 mesh_t *bsp_operation(mesh_t *mesh1, mesh_t *mesh2,int mode)
@@ -21,8 +92,6 @@ mesh_t *bsp_operation(mesh_t *mesh1, mesh_t *mesh2,int mode)
         bsp_node_t *bsp1 = NULL;
         bsp_node_t *bsp2 = NULL;
         mesh_t *out = NULL;
-
-	printf("bsp_operation\n");
 
 	if(mesh1 == NULL) return NULL;
 	if(mesh2 == NULL) return NULL;
@@ -52,7 +121,9 @@ mesh_t *bsp_operation(mesh_t *mesh1, mesh_t *mesh2,int mode)
 	        if(bsp2 != NULL) free_bsp_tree(bsp2);
 
 		if(result == NULL) break;
-        	out = NEW(bsp_mesh_t, "BSP", result);
+        	out = NEW(poly_mesh_t, "poly", result);
+		printf("out is\n");
+		dump_polygons(((poly_mesh_t *)out)->polygons);
 		return out;
 	} while(0);
         if(bsp1 != NULL) free_bsp_tree(bsp1);
@@ -63,41 +134,6 @@ mesh_t *bsp_operation(mesh_t *mesh1, mesh_t *mesh2,int mode)
 
 }
 
-int poly_mesh_init(void *self, void *data) {
-	printf("init called\n");
-//	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
-//	if(data == NULL) {
-//		mesh->bsp = alloc_bsp_node();
-//	}
-//	else {
-//		mesh->bsp = (bsp_node_t*)data;
-//	}
-	return 0;
-}
-
-void poly_mesh_destroy(void *self) {
-	printf("destroy called\n");
-//	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
-//	free_bsp_tree(mesh->bsp);
-//	free(self);
-}
-
-int poly_mesh_poly_count(void *self) {
-	printf("count called\n");
-//	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
-//	return bsp_count_polygons(mesh->bsp);
-	return 0;
-}
-
-klist_t(poly)* poly_mesh_to_polygons(void *self) {
-	klist_t(poly) *polygons=NULL;
-	printf("polygons called self=%p\n",self);
-        polygons = kl_init(poly);
-	// *kl_pushp(poly, dst) = copy;
-//	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
-//	return bsp_to_polygons(mesh->bsp, 0, NULL);
-	return polygons;
-}
 
 
 int _default_write(void *self, char *path, char type[4]);
@@ -106,7 +142,7 @@ bsp_node_t* _default_to_bsp(void *self);
 
 mesh_t *Python2Mesh(PyObject *obj)
 {
-	mesh_t *result=NULL;
+	poly_mesh_t *result=NULL;
 	int i,j,n_polygons,n_vertices;
 	PyObject *str_polygons=PyUnicode_FromString("polygons"); // TODO free
 	PyObject *str_vertices=PyUnicode_FromString("vertices");
@@ -120,10 +156,8 @@ mesh_t *Python2Mesh(PyObject *obj)
 	PyObject *pos, *value;
 	poly_t *poly_m;
 
-//	stl_object *stl =  stl_alloc(NULL, 0);
-//	strncpy(stl->header, sizeof(stl->header), "pythonscad");
-
-
+	klist_t(poly) *polygons_m=NULL;
+        polygons_m = kl_init(poly);
 
 
 	do
@@ -133,10 +167,8 @@ mesh_t *Python2Mesh(PyObject *obj)
 		if(polygons == NULL) break;
 		n_polygons=PyList_Size(polygons);
 
-//		stl->facet_count = n_polygons;
-//                stl->facets = calloc(n_polygons, sizeof(stl_facet));
 
-		printf("polygons len  is %d\n",n_polygons);
+//		printf("polygons len  is %d\n",n_polygons);
 		for(i=0;i<n_polygons;i++)
 		{
 			polygon =PyList_GetItem(polygons,i);
@@ -181,7 +213,8 @@ mesh_t *Python2Mesh(PyObject *obj)
                 	v3_cross(&poly_m->normal, v1, v2, 1);
 //			printf("%f %f %f\n",poly_m->normal[0],poly_m->normal[1],poly_m->normal[2]);
 
-			// TODO hier poly_m in facets reinmachen, passt aber nicht
+			*kl_pushp(poly, polygons_m) = poly_m;
+//			printf("push\n");
 
 			Py_DECREF(polygon);
 		}
@@ -197,29 +230,80 @@ mesh_t *Python2Mesh(PyObject *obj)
 		Py_DECREF(obj);
 
 		// finally create mesh_t here
-		result = (mesh_t *) malloc(sizeof(mesh_t));
+		result = (poly_mesh_t *) malloc(sizeof(poly_mesh_t));
 		if(result == NULL) return NULL ;
 
-		result->init=poly_mesh_init;
-		result->destroy = poly_mesh_destroy;
-		result->poly_count = poly_mesh_poly_count;
-		result->to_polygons = poly_mesh_to_polygons;
-		result->write = _default_write;
-		result->to_bsp = _default_to_bsp;
+		result->proto.init=poly_mesh_init; // TODO use alloc function here ?
+		result->proto.destroy = poly_mesh_destroy;
+		result->proto.poly_count = poly_mesh_poly_count;
+		result->proto.to_polygons = poly_mesh_to_polygons;
+		result->proto.write = _default_write;
+		result->proto.to_bsp = _default_to_bsp;
+		result->polygons=polygons_m;
 
-		return result;
+		return (mesh_t *) result;
 
 
 	} while(0);
-	return result;
+	// TODO free stuff ?
+	return (mesh_t *)result;
 }
 
 PyObject *Mesh2Python(mesh_t *mesh)
 {
+	int i,j;
+	int n_polygons;
 	PyObject *result=NULL;
-	result = Py_BuildValue("i",123);
-        //out->destroy(mesh);
-  	// Py_BuildValue(
+	PyObject *str_polygons=PyUnicode_FromString("polygons"); // TODO free
+	PyObject *str_vertices=PyUnicode_FromString("vertices");
+	PyObject *str_pos=PyUnicode_FromString("pos");
+	PyObject *str_x=PyUnicode_FromString("x");
+	PyObject *str_y=PyUnicode_FromString("y");
+	PyObject *str_z=PyUnicode_FromString("z");
+	poly_mesh_t *poly_mesh = (poly_mesh_t *) mesh;
+	poly_t *poly_m;
+
+	PyObject *polygons,*polygon, *vertices, *vertex, *pos;
+	kliter_t(poly) *poly_iter;
+	
+	n_polygons=count_polygons(poly_mesh->polygons);
+
+	polygons = PyList_New(n_polygons);
+        poly_iter = kl_begin(poly_mesh->polygons);
+	i=0;
+        for(; poly_iter != kl_end(poly_mesh->polygons); poly_iter = kl_next(poly_iter))
+	{
+		poly_m = kl_val(poly_iter); 
+		vertices = PyList_New(poly_m->vertex_count);
+		for(j=0;j<poly_m->vertex_count;j++)
+		{
+			pos = PyDict_New();
+
+			PyDict_SetItem(pos,str_x, Py_BuildValue("f",poly_m->vertices[j][0]));
+			PyDict_SetItem(pos,str_y, Py_BuildValue("f",poly_m->vertices[j][1]));
+			PyDict_SetItem(pos,str_z, Py_BuildValue("f",poly_m->vertices[j][2]));
+
+			vertex = PyDict_New();
+			PyDict_SetItem(vertex,str_pos,pos);
+
+			PyList_SetItem(vertices,j,vertex);
+		}
+
+		polygon = PyDict_New();
+		PyDict_SetItem(polygon,str_vertices,vertices);
+
+		// Calculate Normal
+                float3 *fvs = poly_m->vertices;
+                float3 v1 = {fvs[0][0] - fvs[1][0], fvs[0][1] - fvs[1][1], fvs[0][2] - fvs[1][2]};
+       	        float3 v2 = {fvs[0][0] - fvs[2][0], fvs[0][1] - fvs[2][1], fvs[0][2] - fvs[2][2]};
+               	v3_cross(&poly_m->normal, v1, v2, 1);
+
+		PyList_SetItem(polygons,i,polygon);
+		i++;
+	}
+
+	result = PyDict_New();
+	PyDict_SetItem(result,str_polygons,polygons);
 	Py_INCREF(result);
 	return result;
 }
@@ -240,7 +324,6 @@ static PyObject *mycsg_union(PyObject *self, PyObject *args)
 
   mesh1 = Python2Mesh(arg1);
   mesh2 = Python2Mesh(arg2);
-
   out = bsp_operation(mesh1, mesh2, 0);
 
   result = Mesh2Python(out);
