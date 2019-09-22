@@ -53,14 +53,14 @@ int poly_mesh_init(void *self, void *data) {
 }
 
 void poly_mesh_destroy(void *self) {
-	printf("destroy called\n");
+	printf("destroy called\n"); // TODO implement
 //	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
 //	free_bsp_tree(mesh->bsp);
 //	free(self);
 }
 
 int poly_mesh_poly_count(void *self) {
-	printf("count called\n");
+	printf("count called\n"); // TODO implement
 //	bsp_mesh_t *mesh = (bsp_mesh_t*)self;
 //	return bsp_count_polygons(mesh->bsp);
 	return 0;
@@ -70,18 +70,20 @@ int poly_mesh_poly_count(void *self) {
 klist_t(poly)* poly_mesh_to_polygons(void *self) {
 
 	printf("polygons called self=%p\n",self);
-	// *kl_pushp(poly, dst) = copy;
 	poly_mesh_t *mesh = (poly_mesh_t*)self;
 	return mesh->polygons;
-//	return bsp_to_polygons(mesh->bsp, 0, NULL);
-//	return polygons;
 }
+
+int _default_write(void *self, char *path, char type[4]);
+bsp_node_t* _default_to_bsp(void *self);
 
 mesh_t poly_mesh_t_Proto = {
         .init = poly_mesh_init,
         .destroy = poly_mesh_destroy,
         .poly_count = poly_mesh_poly_count,
         .to_polygons = poly_mesh_to_polygons,
+	.write = _default_write,
+	.to_bsp = _default_to_bsp
 };
 
 
@@ -136,20 +138,35 @@ mesh_t *bsp_operation(mesh_t *mesh1, mesh_t *mesh2,int mode)
 
 
 
-int _default_write(void *self, char *path, char type[4]);
-bsp_node_t* _default_to_bsp(void *self);
 
+PyObject *str_polygons = NULL;
+PyObject *str_vertices = NULL;
+PyObject *str_pos = NULL;
+PyObject *str_plane = NULL;
+PyObject *str_normal = NULL;
+PyObject *str_x = NULL;
+PyObject *str_y = NULL;
+PyObject *str_z = NULL;
+
+void init_python_strings(void)
+{
+	if(str_polygons != NULL)
+		return;
+	str_polygons=PyString_FromString("polygons"); 
+	str_vertices=PyString_FromString("vertices");
+	str_pos = PyString_FromString("pos");
+	str_plane = PyString_FromString("plane");
+	str_normal = PyString_FromString("normal");
+	str_x = PyString_FromString("x");
+	str_y = PyString_FromString("y");
+	str_z = PyString_FromString("z");
+}
 
 mesh_t *Python2Mesh(PyObject *obj)
 {
 	poly_mesh_t *result=NULL;
 	int i,j,n_polygons,n_vertices;
-	PyObject *str_polygons=PyUnicode_FromString("polygons"); // TODO free
-	PyObject *str_vertices=PyUnicode_FromString("vertices");
-	PyObject *str_pos=PyUnicode_FromString("pos");
-	PyObject *str_x=PyUnicode_FromString("x");
-	PyObject *str_y=PyUnicode_FromString("y");
-	PyObject *str_z=PyUnicode_FromString("z");
+	init_python_strings();
 	Py_INCREF(obj);
 	PyObject *polygons, *polygon;
 	PyObject *vertices, *vertex;
@@ -158,6 +175,7 @@ mesh_t *Python2Mesh(PyObject *obj)
 
 	klist_t(poly) *polygons_m=NULL;
         polygons_m = kl_init(poly);
+	int good=0;
 
 
 	do
@@ -171,6 +189,9 @@ mesh_t *Python2Mesh(PyObject *obj)
 //		printf("polygons len  is %d\n",n_polygons);
 		for(i=0;i<n_polygons;i++)
 		{
+			good=0;
+			poly_m=NULL;
+
 			polygon =PyList_GetItem(polygons,i);
 			if(polygon == NULL) continue;
 			Py_INCREF(polygon);
@@ -178,11 +199,12 @@ mesh_t *Python2Mesh(PyObject *obj)
 			if(vertices == NULL) continue;
 			n_vertices=PyList_Size(vertices);
 			poly_m = malloc(sizeof(poly_t));
-			if(poly_m == NULL) return NULL;
+			if(poly_m == NULL) break;
 			poly_m->vertex_count=n_vertices;
 			poly_m->vertex_max=n_vertices;
 		       	poly_m->vertices = malloc(n_vertices * sizeof(float3));
-			if(poly_m->vertices == NULL) continue; // TODO fix
+			if(poly_m->vertices == NULL) break;
+			good=1;
 
 			for(j=0;j<n_vertices;j++)
 			{
@@ -218,27 +240,17 @@ mesh_t *Python2Mesh(PyObject *obj)
 
 			Py_DECREF(polygon);
 		}
+		if(!good)
+		{
+			// TODO cleanup here
+		}
 
-// PyObject_GetAttr			
-
-//        mesh1 = mesh_read_file(path1);
-//        check(mesh1 != NULL, "Failed to read mesh from '%s'", path1);
-//        log_info("Loaded file: %s %d facets", path1, mesh1->poly_count(mesh1));
-//        if(mesh1 != NULL) mesh1->destroy(mesh1);
-//        if(mesh2 != NULL) mesh2->destroy(mesh2);
-//        check(out->write(out, out_path, "STL") == 0, "Failed to write STL to %s", out_path);
 		Py_DECREF(obj);
 
 		// finally create mesh_t here
 		result = (poly_mesh_t *) malloc(sizeof(poly_mesh_t));
 		if(result == NULL) return NULL ;
-
-		result->proto.init=poly_mesh_init; // TODO use alloc function here ?
-		result->proto.destroy = poly_mesh_destroy;
-		result->proto.poly_count = poly_mesh_poly_count;
-		result->proto.to_polygons = poly_mesh_to_polygons;
-		result->proto.write = _default_write;
-		result->proto.to_bsp = _default_to_bsp;
+		result->proto = poly_mesh_t_Proto;
 		result->polygons=polygons_m;
 
 		return (mesh_t *) result;
@@ -254,12 +266,7 @@ PyObject *Mesh2Python(mesh_t *mesh)
 	int i,j;
 	int n_polygons;
 	PyObject *result=NULL;
-	PyObject *str_polygons=PyUnicode_FromString("polygons"); // TODO free
-	PyObject *str_vertices=PyUnicode_FromString("vertices");
-	PyObject *str_pos=PyUnicode_FromString("pos");
-	PyObject *str_x=PyUnicode_FromString("x");
-	PyObject *str_y=PyUnicode_FromString("y");
-	PyObject *str_z=PyUnicode_FromString("z");
+	init_python_strings();
 	poly_mesh_t *poly_mesh = (poly_mesh_t *) mesh;
 	poly_t *poly_m;
 
@@ -298,6 +305,20 @@ PyObject *Mesh2Python(mesh_t *mesh)
        	        float3 v2 = {fvs[0][0] - fvs[2][0], fvs[0][1] - fvs[2][1], fvs[0][2] - fvs[2][2]};
                	v3_cross(&poly_m->normal, v1, v2, 1);
 
+		// store as poly.plane.normal
+
+		pos = PyDict_New();
+
+		PyDict_SetItem(pos,str_x, Py_BuildValue("f",poly_m->normal[0]));
+		PyDict_SetItem(pos,str_y, Py_BuildValue("f",poly_m->normal[1]));
+		PyDict_SetItem(pos,str_z, Py_BuildValue("f",poly_m->normal[2]));
+
+		vertex = PyDict_New();
+		PyDict_SetItem(vertex,str_normal,pos);
+
+
+		PyDict_SetItem(polygon,str_plane,vertex);
+
 		PyList_SetItem(polygons,i,polygon);
 		i++;
 	}
@@ -307,6 +328,7 @@ PyObject *Mesh2Python(mesh_t *mesh)
 	Py_INCREF(result);
 	return result;
 }
+
 static PyObject *mycsg_union(PyObject *self, PyObject *args)
 {
   PyObject *arg1;
@@ -317,7 +339,6 @@ static PyObject *mycsg_union(PyObject *self, PyObject *args)
   mesh_t *out;
 
   printf("Union !\n");
-
   if (!PyArg_ParseTuple(args, "OO",&arg1, &arg2)) {
     return NULL;
   }
@@ -327,7 +348,53 @@ static PyObject *mycsg_union(PyObject *self, PyObject *args)
   out = bsp_operation(mesh1, mesh2, 0);
 
   result = Mesh2Python(out);
-  printf("result=%p\n",result);
+  Py_INCREF(result);
+
+  return result;
+}
+
+static PyObject *mycsg_difference(PyObject *self, PyObject *args)
+{
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *result;
+  mesh_t *mesh1;
+  mesh_t *mesh2;
+  mesh_t *out;
+
+  printf("Union !\n");
+  if (!PyArg_ParseTuple(args, "OO",&arg1, &arg2)) {
+    return NULL;
+  }
+
+  mesh1 = Python2Mesh(arg1);
+  mesh2 = Python2Mesh(arg2);
+  out = bsp_operation(mesh1, mesh2, 1);
+
+  result = Mesh2Python(out);
+  Py_INCREF(result);
+
+  return result;
+}
+static PyObject *mycsg_intersection(PyObject *self, PyObject *args)
+{
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *result;
+  mesh_t *mesh1;
+  mesh_t *mesh2;
+  mesh_t *out;
+
+  printf("Union !\n");
+  if (!PyArg_ParseTuple(args, "OO",&arg1, &arg2)) {
+    return NULL;
+  }
+
+  mesh1 = Python2Mesh(arg1);
+  mesh2 = Python2Mesh(arg2);
+  out = bsp_operation(mesh1, mesh2, 2);
+
+  result = Mesh2Python(out);
   Py_INCREF(result);
 
   return result;
@@ -346,6 +413,8 @@ static PyObject *mycsg_printHello(PyObject *self, PyObject *args)
 static PyMethodDef mycsgMethods[] = {
   {"printHello", mycsg_printHello, METH_VARARGS , "Prints ’Hello World’."},
   {"union", mycsg_union, METH_VARARGS , "Builds the Union of two STLs."},
+  {"difference", mycsg_difference, METH_VARARGS , "Builds the Union of two STLs."},
+  {"intersection", mycsg_intersection, METH_VARARGS , "Builds the Union of two STLs."},
   {NULL, NULL, 0, NULL},
 };
 

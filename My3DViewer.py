@@ -436,7 +436,7 @@ class My3DViewer(Gtk.GLArea):
 
 
 
-        self.set_double_buffered(GL_TRUE)
+        self.set_double_buffered(GL_FALSE)
         self.set_size_request(500, 500)
         self.draw_inst = None
 
@@ -447,7 +447,12 @@ class My3DViewer(Gtk.GLArea):
         self.pts = []  # TODO activate
 
     def addVertices(self,result): 
-        polygons=result.toPolygons()
+        print("keys are")
+        polygons=None
+        for key,value  in result.items():
+            print(key)
+            polygons = value
+            print(polygons)
 
         startind=len(self.indices)
        	for polygon in polygons:
